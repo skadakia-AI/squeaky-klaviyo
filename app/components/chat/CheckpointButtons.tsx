@@ -1,0 +1,42 @@
+interface CheckpointButtonsProps {
+  type: 'jd_preview' | 'pursue_or_pass'
+  onChoice: (value: string) => void
+  disabled: boolean
+}
+
+const BUTTONS = {
+  jd_preview: [
+    { label: 'This is the right JD — continue', value: 'y', primary: true },
+    { label: 'Re-enter', value: 'n', primary: false },
+  ],
+  pursue_or_pass: [
+    { label: 'Target my resume', value: 'yes, proceed', primary: true },
+    { label: 'Pass on this role', value: 'pass', primary: false },
+  ],
+}
+
+export default function CheckpointButtons({ type, onChoice, disabled }: CheckpointButtonsProps) {
+  return (
+    <div
+      className="fixed bottom-0 left-0 right-0 flex items-center justify-center gap-3 px-6"
+      style={{ height: 64, borderTop: '1px solid #E5E7EB', backgroundColor: '#FFFFFF' }}
+    >
+      {BUTTONS[type].map(btn => (
+        <button
+          key={btn.value}
+          onClick={() => onChoice(btn.value)}
+          disabled={disabled}
+          className="px-5 py-2 text-sm font-medium rounded"
+          style={{
+            backgroundColor: btn.primary ? '#111827' : '#F3F4F6',
+            color: btn.primary ? '#FFFFFF' : '#111827',
+            borderRadius: 6,
+            opacity: disabled ? 0.5 : 1,
+          }}
+        >
+          {btn.label}
+        </button>
+      ))}
+    </div>
+  )
+}
