@@ -35,7 +35,11 @@
 - [ ] Visual refresh — current UI is too gray/flat; needs more personality and energy
 
 ### Architecture
-- [ ] Rethink deterministic orchestrator vs. LLM-based router — evaluate whether a routing model would handle edge cases (bad input, ambiguous state) better than the current state machine
+- [ ] **Orchestrator UX** — should feel conversational and intuitive, like a smart advisor keeping the user on track; not a rigid step-by-step funnel. User objectives are the constraint, not the sequence.
+- [ ] **Eval framework** — replace vibes-based testing with a structured eval system: defined criteria per skill output, benchmark inputs, pass/fail scoring, and regression tracking across prompt changes. Not "test until it feels right."
+- [ ] **Dynamic routing / sub-agent spawning** — replace forced linear state machine with an orchestrator that can dynamically route to skills, tools, or sub-agents based on context. Clean separation of concerns and delegation must be preserved (each skill knows its role, inputs, outputs), but the routing should be fluid and agentic — not hardcoded step → step. Connects to LLM-router evaluation below.
+- [ ] **Rethink deterministic orchestrator vs. LLM-based router** — evaluate whether a routing model would handle edge cases (bad input, ambiguous state, user going off-script) better than the current state machine.
+- [ ] **Progressive JD disclosure** — rethink what decoded JD information surfaces at which step. Some sections are relevant upfront (business context, no-brainer hire); others are more useful downstream (success criteria for targeting, requirements for fit assessment). Surface the right intel at the right moment rather than dumping everything at once.
 
 ### Testing
 - [ ] Full end-to-end test (Playwright or similar) — deferred until core flow is stable
