@@ -1,0 +1,16 @@
+# Secrets — never read these
+.env
+.env.local
+.env*.local
+.env.production
+.env.development
+*.pem
+*.key
+*.p12
+*.pfx
+
+# Auth / credential files
+.netrc
+.npmrc
+credentials.json
+service-account*.json

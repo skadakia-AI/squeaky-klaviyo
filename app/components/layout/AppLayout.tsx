@@ -1,28 +1,37 @@
 'use client'
 
-import { useState, useCallback } from 'react'
 import Header from './Header'
 import ChatPane from '../chat/ChatPane'
+import DiffViewPanel from '../diff/DiffViewPanel'
+import { useSession } from '../../lib/session'
 
 export default function AppLayout() {
-  const [hasActiveSession, setHasActiveSession] = useState(false)
-  const [resetKey, setResetKey] = useState(0)
-
-  function handleSessionChange(sessionId: string | null) {
-    setHasActiveSession(!!sessionId)
-  }
-
-  const handleNewRole = useCallback(() => {
-    setHasActiveSession(false)
-    setResetKey(k => k + 1)  // remounts ChatPane, resetting all state
-  }, [])
+  const session = useSession()
 
   return (
     <div className="flex flex-col h-screen" style={{ backgroundColor: '#F9FAFB' }}>
-      <Header hasActiveSession={hasActiveSession} onNewRole={handleNewRole} />
+      <Header
+        hasActiveSession={!!session.sessionId}
+        onNewRole={session.startNewSession}
+      />
       <div className="flex flex-col flex-1 overflow-hidden" style={{ marginTop: 48 }}>
-        <ChatPane key={resetKey} onSessionChange={handleSessionChange} />
+        <ChatPane session={session} />
       </div>
+
+      {session.showDiffView && session.targetingData && (
+        <DiffViewPanel
+          targetingData={session.targetingData}
+          resumeData={session.resumeData}
+          bulletReviews={session.bulletReviews}
+          bulletEdits={session.bulletEdits}
+          unreviewedCount={session.unreviewedCount}
+          isStreaming={session.isStreaming}
+          onAccept={session.acceptBullet}
+          onReject={session.rejectBullet}
+          onEdit={session.editBullet}
+          onDownload={session.downloadResume}
+        />
+      )}
     </div>
   )
 }

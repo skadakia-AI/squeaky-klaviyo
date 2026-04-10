@@ -74,6 +74,43 @@ export interface CredibilityCheck {
   notes: string
 }
 
+// ─── SSE / API wire types ─────────────────────────────────────────────────────
+
+export type OutboundMessage = {
+  type: 'text' | 'file_upload'
+  content: string
+  file_name?: string
+  file_type?: string
+}
+
+export type SSEEvent =
+  | { type: 'session_created'; session_id: string }
+  | { type: 'token'; content: string }
+  | { type: 'message'; role: 'assistant'; content: string; progress?: boolean }
+  | { type: 'step_complete'; step: CurrentStep; data?: unknown }
+  | { type: 'error'; code: string; message: string }
+  | { type: 'done' }
+
+export interface ActiveSession {
+  id: string
+  current_step: CurrentStep
+  status: string
+  company?: string
+  role?: string
+  verdict?: string
+  arc_alignment?: string
+  bullet_reviews?: Record<string, boolean>
+  bullet_edits?: Record<string, string>
+}
+
+export interface StoredMessage {
+  id: string
+  role: 'user' | 'assistant'
+  content: string
+  step: string
+  created_at: string
+}
+
 // ─── Session / step ───────────────────────────────────────────────────────────
 
 export type CurrentStep =
@@ -105,6 +142,7 @@ export interface FitAssessmentData {
 
 export type ChatMessageType =
   | 'text'
+  | 'progress'
   | 'jd_decode_card'
   | 'fit_assessment_card'
   | 'error'
