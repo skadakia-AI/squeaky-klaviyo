@@ -57,7 +57,7 @@ export default function FitAssessmentCard({ data, content, onChoice, disabled }:
             borderRadius: 6,
           }}
         >
-          Target my resume
+          Tailor my resume
         </button>
         <button
           onClick={() => onChoice('pass')}
@@ -69,7 +69,7 @@ export default function FitAssessmentCard({ data, content, onChoice, disabled }:
             borderRadius: 6,
           }}
         >
-          Pass on this role
+          Skip this role
         </button>
       </div>
     </div>

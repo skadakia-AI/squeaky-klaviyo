@@ -28,7 +28,7 @@ export default function MessageList({
         const isLast = i === messages.length - 1
 
         if (msg.role === 'user') {
-          return <UserMessage key={msg.id} content={msg.content} />
+          return <UserMessage key={msg.id} content={msg.content} type={msg.type} />
         }
 
         switch (msg.type) {

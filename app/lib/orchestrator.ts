@@ -90,9 +90,9 @@ async function handleCreated(
   await updateSession(sessionId, userId, { current_step: 'jd_loaded' })
   emit({ type: 'step_complete', step: 'jd_loaded' })
 
-  const preview = jdResult.rawText.slice(0, 800).trim()
-  const sparse = jdResult.sparse ? '\n\n_Note: this text looks sparse — the full decode may be limited. You can continue or re-enter._' : ''
-  const previewMsg = `Here's what I fetched:\n\n> ${preview}...\n\nDoes this look like the right job description?${sparse}`
+  const preview = jdResult.rawText.slice(0, 200).trim()
+  const sparse = jdResult.sparse ? ' (Note: the text looks sparse — the decode may be limited. You can continue or re-enter.)' : ''
+  const previewMsg = `Got it — here's a preview:\n\n"${preview}..."\n\nDoes this look right?${sparse}`
 
   await storeMessage(sessionId, 'assistant', previewMsg, 'jd_loaded')
   emit({ type: 'message', role: 'assistant', content: previewMsg })

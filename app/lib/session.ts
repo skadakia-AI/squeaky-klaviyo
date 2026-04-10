@@ -199,12 +199,12 @@ export function useSession() {
     const userMsg: ChatMessage = {
       id: crypto.randomUUID(),
       role: 'user',
-      content: message.content || message.file_name || '',
-      type: 'text',
+      content: message.type === 'file_upload' ? (message.file_name ?? 'Uploaded file') : message.content,
+      type: message.type === 'file_upload' ? 'file_upload' : 'text',
       timestamp: Date.now(),
     }
 
-    setState(prev => ({ ...prev, isStreaming: true, error: null, messages: [...prev.messages, userMsg] }))
+    setState(prev => ({ ...prev, isStreaming: true, error: null, checkpoint: null, messages: [...prev.messages, userMsg] }))
 
     cleanupRef.current?.()
     cleanupRef.current = openStream(message, stateRef.current.sessionId, handleEvent)

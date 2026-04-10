@@ -142,6 +142,7 @@ export interface FitAssessmentData {
 
 export type ChatMessageType =
   | 'text'
+  | 'file_upload'
   | 'progress'
   | 'jd_decode_card'
   | 'fit_assessment_card'
