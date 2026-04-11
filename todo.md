@@ -38,7 +38,7 @@
 
 ### Architecture
 - [x] **Intent classifier** — Haiku-powered `classifyIntent` sits above the orchestrator dispatch; routes chat/unclear to `handleChat`, passes typed `resolvedAction` to the state machine. String-matching branches removed from orchestrator.
-- [ ] **Phase 5: unclear handling** — currently `unclear` and `chat` both fall through to `handleChat`. May want distinct behavior (e.g., ask for clarification vs. answer a question).
+- [ ] **Phase 5: unclear handling** — `unclear` intentionally routes same as `chat`. If live testing shows poor behavior, add clarification instruction to `handleChat` system prompt. No code change needed yet.
 - [ ] **Reminder bubble UX** — `handleChat` currently appends a separate reminder bubble after the streamed response. Consider whether the reminder should be folded into the streamed reply instead (less jarring).
 - [ ] **Out-of-order step requests** — user asking to go back mid-flow (e.g., "use a different JD" at assessed) currently routes to handleChat and says to start new session. Needs proper handling.
 - [ ] **assessed_numbers refinement** — classifier context may need more nuance; deferred.
