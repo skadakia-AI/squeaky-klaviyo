@@ -276,36 +276,44 @@ The orchestrator calls `classifyIntent(context, userMessage)` in `app/lib/intent
 
 ```typescript
 { action: StepAction, confidence: 'high' | 'low' }
-// StepAction: 'confirm' | 'reject' | 'pass' | 'scope_confirm' | 'scope_add' | 'numbers_response' | 'chat' | 'unclear'
+// StepAction: 'confirm' | 'reject' | 'pass' | 'scope_confirm' | 'scope_add'
+//           | 'numbers_response' | 'resume_submit' | 'chat' | 'unclear'
 ```
 
-If `action` is `'chat'` or `'unclear'`, the orchestrator calls `handleChat()` and returns — the state machine never runs. No step advances. No session state changes.
+If `action` is `'chat'` or `'unclear'`, the orchestrator loads session context via `resolveSessionContext()`, then calls `handleChat()` and returns — the state machine never runs. No step advances. No session state changes.
 
 If `action` is a task action (`confirm`, `reject`, `pass`, etc.), the orchestrator stores it as `resolvedAction` and passes it into the step handler. The step handler uses `resolvedAction` instead of string-matching the raw user message.
 
-**Which steps use it:**
+**Checkpoint buttons bypass classification entirely:**
 
-| Step | Context passed to classifier | Valid actions |
+When a user clicks a checkpoint button (e.g., "This is the right JD — continue"), the UI sends `{ type: 'checkpoint', content: 'confirm' }`. The orchestrator detects `type === 'checkpoint'` and sets `resolvedAction` directly from the content — no Haiku call, no ambiguity. Button clicks have known intent.
+
+**Which steps use classification:**
+
+| Step | Context | Valid actions |
 |---|---|---|
 | `jd_loaded` | `'jd_loaded'` | confirm, reject, chat, unclear |
+| `decoded` | `'decoded'` | resume_submit, chat, unclear |
 | `resume_loaded` | `'resume_loaded'` | confirm, chat, unclear |
 | `assessed` (pursue/pass) | `'assessed_pursue_or_pass'` | confirm, pass, chat, unclear |
 | `assessed` (scope) | `'assessed_scope'` | scope_confirm, scope_add, chat, unclear |
 | `assessed` (numbers) | `'assessed_numbers'` | numbers_response, chat, unclear |
 
-**Which steps skip it:**
+**Which steps skip classification:**
 
-`created`, `decoded`, `targeted`, `exported`, `not_pursuing`, `abandoned`. These steps either have unambiguous inputs (file uploads, fixed workflow position) or are terminal states.
+`created`, `targeted`, `exported`, `not_pursuing`, `abandoned`. Terminal states or steps with unambiguous input. File uploads always skip classification regardless of step.
 
-File uploads always skip classification regardless of step.
+**`handleChat` and session context:**
 
-**`handleChat`:**
+When the orchestrator routes to `handleChat`, it first calls `resolveSessionContext(userId, sessionId)` from `app/lib/utils/session-context.ts`. This reads every artifact that exists so far for the session — `raw_jd.md`, `decoded_jd.md`, `resume_main.md`, `fit_assessment.md` — and returns them as a formatted string. Missing files are silently skipped.
 
-The chat handler (`app/lib/handle-chat.ts`) calls Claude Sonnet with a scoped system prompt. It streams tokens directly to the browser. After the response, it stores the message under `step: 'chat'` (so it doesn't pollute skill conversation history). It then emits a pending reminder — a short message reminding the user what question the app is waiting on. The reminder is keyed by the same `IntentContext` used for classification.
+That string is passed into `handleChat` as `artifactContext` and injected into the Claude system prompt, so answers are grounded in actual session content rather than generic knowledge. At the `decoded` step, only the decoded JD exists, so Claude can answer questions about what was just decoded. At `assessed`, Claude has the JD, resume, and fit assessment — the full picture.
+
+After streaming the response, `handleChat` stores the message under `step: 'chat'` (isolated from skill conversation history) and emits a pending reminder keyed by the current `IntentContext`.
 
 **Why this design:**
 
-Before this gate, the orchestrator used regex and string matching to distinguish "yes" from "no" from "pass". That brittle approach collapsed when users phrased things unexpectedly. The classifier handles natural language variation. The state machine handles what happens next. Each does one job.
+Before this gate, the orchestrator used regex and string matching to distinguish "yes" from "no" from "pass". That broke when users phrased things unexpectedly. The classifier handles natural language. The state machine handles routing. Session context gives `handleChat` the material to answer intelligently. Each component does one job.
 
 ---
 
