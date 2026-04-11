@@ -114,8 +114,11 @@ export function useSession() {
   const [pendingRecovery, setPendingRecovery] = useState<{ session: ActiveSession; messages: StoredMessage[] } | null>(null)
 
   const stateRef = useRef(state)
-  stateRef.current = state
   const cleanupRef = useRef<(() => void) | null>(null)
+
+  useEffect(() => {
+    stateRef.current = state
+  })
 
   useEffect(() => {
     getActiveSession().then(({ session, messages }) => {

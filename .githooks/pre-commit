@@ -1,7 +1,14 @@
 #!/bin/sh
 
-# 1. Lint
+# 1. Lint — exit 1 on errors (warnings are allowed through)
 npm run lint --silent
+LINT_EXIT=$?
+if [ $LINT_EXIT -ne 0 ]; then
+  echo ""
+  echo "Commit blocked: lint errors must be fixed before committing."
+  echo "Run 'npm run lint' to see the details."
+  exit 1
+fi
 
 # 2. Warn if behavior-critical source files changed without any test file changes
 CHANGED=$(git diff --cached --name-only)
