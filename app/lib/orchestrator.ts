@@ -8,7 +8,9 @@ import { exportResume } from './utils/export-resume'
 import { runJDDecoder } from './skills/jd-decoder'
 import { runJDMatchTurn1, runJDMatchTurn2 } from './skills/jd-match'
 import { runResumeTargetingTurn1, runResumeTargetingTurn2 } from './skills/resume-targeting'
-import type { CurrentStep, Resume } from './types'
+import { classifyIntent } from './intent-decoder'
+import { handleChat } from './handle-chat'
+import type { CurrentStep, Resume, IntentContext, StepAction } from './types'
 
 export type OrchestratorEvent =
   | { type: 'session_created'; session_id: string }
@@ -36,12 +38,34 @@ export async function runOrchestrator(
 
   await storeMessage(sessionId, 'user', message.content || message.file_name || '', currentStep)
 
+  // ─── Intent classification gate ─────────────────────────────────────────────
+  // File uploads and steps with unambiguous input skip classification.
+  // For all other steps, classify before dispatching. If the user is chatting
+  // or intent is unclear, respond conversationally and return without advancing.
+
+  const SKIP_CLASSIFICATION = new Set<CurrentStep>([
+    'created', 'decoded', 'targeted', 'exported', 'not_pursuing', 'abandoned',
+  ])
+
+  let resolvedAction: StepAction | null = null
+
+  if (message.type !== 'file_upload' && !SKIP_CLASSIFICATION.has(currentStep)) {
+    const context = await resolveIntentContext(sessionId, currentStep)
+    if (context) {
+      const intent = await classifyIntent(context, message.content)
+      if (intent.action === 'chat' || intent.action === 'unclear') {
+        await handleChat(sessionId, userId, message.content, context, emit)
+        return
+      }
+      resolvedAction = intent.action
+    }
+  }
+
   if (currentStep === 'created') {
     await handleCreated(sessionId, userId, message, emit)
 
   } else if (currentStep === 'jd_loaded') {
-    const lower = message.content.toLowerCase().trim()
-    if (lower === 'n' || lower === 'no') {
+    if (resolvedAction === 'reject') {
       await updateSession(sessionId, userId, { current_step: 'created' })
       emit({ type: 'message', role: 'assistant', content: 'OK — paste or upload the job description again.' })
     } else {
@@ -56,7 +80,7 @@ export async function runOrchestrator(
     await handleArcCheckpoint(sessionId, userId, message, emit)
 
   } else if (currentStep === 'assessed') {
-    await handleAssessed(sessionId, userId, message, session, emit)
+    await handleAssessed(sessionId, userId, message, session, resolvedAction, emit)
 
   } else if (currentStep === 'targeted') {
     await handleExport(sessionId, userId, emit)
@@ -218,12 +242,10 @@ async function handleAssessed(
   userId: string,
   message: InboundMessage,
   session: Record<string, unknown>,
+  resolvedAction: StepAction | null,
   emit: (event: OrchestratorEvent) => void
 ) {
-  const lower = message.content.toLowerCase()
-  const isPass = /\b(pass|not pursuing|not interested|i'll pass|i will pass)\b/.test(lower)
-
-  if (isPass) {
+  if (resolvedAction === 'pass') {
     await updateSession(sessionId, userId, { current_step: 'not_pursuing', status: 'not_pursuing' })
     emit({ type: 'step_complete', step: 'not_pursuing' })
     emit({ type: 'message', role: 'assistant', content: 'Got it. This session is saved to your pipeline. Start a new session to work on a different role.' })
@@ -259,8 +281,7 @@ async function handleAssessed(
     const arcAlignment = session.arc_alignment as string
 
     let scopeIds: string[]
-    const isConfirm = /\b(yes|ok|sure|looks good|confirm|proceed|go ahead)\b/.test(lower)
-    if (isConfirm) {
+    if (resolvedAction === 'scope_confirm') {
       const scopeCount = arcAlignment === 'weak' ? 1 : 2
       scopeIds = roles.slice(0, scopeCount).map(r => r.id)
     } else {
@@ -344,4 +365,28 @@ async function handleExport(
 
   emit({ type: 'step_complete', step: 'exported' })
   emit({ type: 'message', role: 'assistant', content: `Your resume is ready. [Download](${result.downloadUrl})` })
+}
+
+// ─── Intent context resolution ────────────────────────────────────────────────
+// Maps the current step to the right IntentContext for classification.
+// For the assessed step, the sub-state is inferred from stored message history.
+
+async function resolveIntentContext(sessionId: string, step: CurrentStep): Promise<IntentContext | null> {
+  switch (step) {
+    case 'jd_loaded':    return 'jd_loaded'
+    case 'resume_loaded': return 'resume_loaded'
+    case 'assessed': {
+      const messages = await fetchMessages(sessionId, 'assessed')
+      const assistantMessages = messages.filter(m => m.role === 'assistant')
+      if (assistantMessages.length === 0) return 'assessed_pursue_or_pass'
+      const hasTurn1 = assistantMessages.length >= 2 ||
+        (assistantMessages.length === 1 && !assistantMessages[0].content.includes("I'll rewrite"))
+      if (!hasTurn1) return 'assessed_scope'
+      const last = assistantMessages[assistantMessages.length - 1]
+      const askedForNumbers = last.content.includes('Before I rewrite') ||
+        last.content.includes('I need a few numbers')
+      return askedForNumbers ? 'assessed_numbers' : 'assessed_pursue_or_pass'
+    }
+    default: return null
+  }
 }

@@ -1,5 +1,24 @@
 import type { OutboundMessage, SSEEvent } from './types'
 
+// Parses a raw SSE buffer string into complete events and a leftover remainder.
+// The remainder is whatever arrived after the last \n\n delimiter — it belongs
+// to the next chunk. Malformed events are skipped silently.
+export function parseSSEBuffer(raw: string): { events: SSEEvent[]; remaining: string } {
+  const parts = raw.split('\n\n')
+  const remaining = parts.pop() ?? ''
+  const events: SSEEvent[] = []
+  for (const part of parts) {
+    const line = part.trim()
+    if (!line.startsWith('data: ')) continue
+    try {
+      events.push(JSON.parse(line.slice(6)) as SSEEvent)
+    } catch {
+      // malformed event — skip
+    }
+  }
+  return { events, remaining }
+}
+
 // EventSource only supports GET — we use fetch + ReadableStream for POST SSE.
 export function openStream(
   message: OutboundMessage,
@@ -30,19 +49,10 @@ export function openStream(
 
         buffer += decoder.decode(value, { stream: true })
 
-        // SSE wire format: each event is "data: {...}\n\n"
-        const parts = buffer.split('\n\n')
-        buffer = parts.pop() ?? ''
-
-        for (const part of parts) {
-          const line = part.trim()
-          if (!line.startsWith('data: ')) continue
-          try {
-            const event = JSON.parse(line.slice(6)) as SSEEvent
-            onEvent(event)
-          } catch {
-            console.error('[sse] failed to parse event:', line)
-          }
+        const { events, remaining } = parseSSEBuffer(buffer)
+        buffer = remaining
+        for (const event of events) {
+          onEvent(event)
         }
       }
     })

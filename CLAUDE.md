@@ -5,6 +5,19 @@
 **Never read `.env.local`, `.env`, or any `.env*` file.** These contain production secrets.
 **Never run `git push` without explicit user instruction and confirmation.**
 
+---
+
+## Test Rule
+
+Any change to `app/lib/orchestrator.ts`, `app/lib/session.ts`, `app/lib/sse.ts`, any file in `app/lib/skills/`, or any file in `app/lib/utils/` that adds or changes behavior **must** include a corresponding test addition or update in the same session.
+
+- New step handler → new orchestrator integration test covering the happy path and at least one error path
+- New branch or condition in existing logic → test that exercises the new branch
+- Bug fix → test that would have caught the bug before the fix
+- Intentional behavior change → update the existing test to reflect the new expected behavior
+
+Do not mark a coding task complete without verifying the test suite covers the new behavior. Run `npm run test` before finishing.
+
 # Squeaky — Project Guide for Claude
 
 ## What This Is

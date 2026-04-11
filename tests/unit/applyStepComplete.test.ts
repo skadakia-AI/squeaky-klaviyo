@@ -1,0 +1,259 @@
+import { describe, it, expect } from 'vitest'
+import { applyStepComplete } from '../../app/lib/session'
+import type { ClientState, ChatMessage, CurrentStep } from '../../app/lib/types'
+
+// ─── Helpers ──────────────────────────────────────────────────────────────────
+
+function buildState(overrides: Partial<ClientState> = {}): ClientState {
+  return {
+    sessionId: null,
+    currentStep: null,
+    isStreaming: false,
+    messages: [],
+    checkpoint: null,
+    showDiffView: false,
+    targetingData: null,
+    resumeData: null,
+    bulletReviews: {},
+    bulletEdits: {},
+    unreviewedCount: 0,
+    error: null,
+    ...overrides,
+  }
+}
+
+function buildMessage(overrides: Partial<ChatMessage> = {}): ChatMessage {
+  return {
+    id: 'msg-1',
+    role: 'assistant',
+    content: 'test content',
+    type: 'text',
+    timestamp: 0,
+    ...overrides,
+  }
+}
+
+// ─── jd_loaded ────────────────────────────────────────────────────────────────
+
+describe('jd_loaded', () => {
+  it('sets currentStep and checkpoint', () => {
+    const state = buildState()
+    const next = applyStepComplete(state, 'jd_loaded')
+    expect(next.currentStep).toBe('jd_loaded')
+    expect(next.checkpoint).toBe('jd_preview')
+  })
+
+  it('does not mutate the original state', () => {
+    const state = buildState({ checkpoint: null })
+    applyStepComplete(state, 'jd_loaded')
+    expect(state.checkpoint).toBeNull()
+  })
+})
+
+// ─── jd_confirmed ─────────────────────────────────────────────────────────────
+
+describe('jd_confirmed', () => {
+  it('clears the checkpoint', () => {
+    const state = buildState({ checkpoint: 'jd_preview' })
+    const next = applyStepComplete(state, 'jd_confirmed')
+    expect(next.checkpoint).toBeNull()
+  })
+
+  it('does not change currentStep', () => {
+    const state = buildState({ currentStep: 'jd_loaded' })
+    const next = applyStepComplete(state, 'jd_confirmed')
+    expect(next.currentStep).toBe('jd_loaded')
+  })
+})
+
+// ─── decoded ──────────────────────────────────────────────────────────────────
+
+describe('decoded', () => {
+  it('promotes the last assistant text message to jd_decode_card', () => {
+    const state = buildState({
+      messages: [buildMessage({ role: 'assistant', type: 'text', content: '# JD Decoded...' })],
+    })
+    const next = applyStepComplete(state, 'decoded')
+    expect(next.messages[0].type).toBe('jd_decode_card')
+  })
+
+  it('only promotes the last assistant text message when multiple exist', () => {
+    const state = buildState({
+      messages: [
+        buildMessage({ id: 'a', role: 'assistant', type: 'text', content: 'first' }),
+        buildMessage({ id: 'b', role: 'assistant', type: 'text', content: 'last' }),
+      ],
+    })
+    const next = applyStepComplete(state, 'decoded')
+    expect(next.messages[0].type).toBe('text')
+    expect(next.messages[1].type).toBe('jd_decode_card')
+  })
+
+  it('skips non-text assistant messages when finding the last one', () => {
+    const state = buildState({
+      messages: [
+        buildMessage({ id: 'a', role: 'assistant', type: 'text', content: 'the one' }),
+        buildMessage({ id: 'b', role: 'assistant', type: 'progress', content: 'Decoding...' }),
+      ],
+    })
+    const next = applyStepComplete(state, 'decoded')
+    expect(next.messages[0].type).toBe('jd_decode_card')
+    expect(next.messages[1].type).toBe('progress')
+  })
+
+  it('leaves messages unchanged when there are no assistant text messages', () => {
+    const state = buildState({
+      messages: [buildMessage({ role: 'user', type: 'text', content: 'here is the jd' })],
+    })
+    const next = applyStepComplete(state, 'decoded')
+    expect(next.messages[0].type).toBe('text')
+  })
+
+  it('sets currentStep to decoded and clears checkpoint', () => {
+    const state = buildState({ checkpoint: 'jd_preview' })
+    const next = applyStepComplete(state, 'decoded')
+    expect(next.currentStep).toBe('decoded')
+    expect(next.checkpoint).toBeNull()
+  })
+})
+
+// ─── resume_loaded ────────────────────────────────────────────────────────────
+
+describe('resume_loaded', () => {
+  it('sets currentStep', () => {
+    const state = buildState()
+    const next = applyStepComplete(state, 'resume_loaded')
+    expect(next.currentStep).toBe('resume_loaded')
+  })
+})
+
+// ─── assessed ─────────────────────────────────────────────────────────────────
+
+describe('assessed', () => {
+  const assessmentData = {
+    verdict: 'no-brainer' as const,
+    hard_req_status: 'all met',
+    arc_alignment: 'strong' as const,
+    key_factors: 'Led infra at scale',
+  }
+
+  it('promotes last assistant text message to fit_assessment_card with data', () => {
+    const state = buildState({
+      messages: [buildMessage({ role: 'assistant', type: 'text', content: 'You are a strong fit...' })],
+    })
+    const next = applyStepComplete(state, 'assessed', assessmentData)
+    expect(next.messages[0].type).toBe('fit_assessment_card')
+    expect((next.messages[0].data as { verdict: string })?.verdict).toBe('no-brainer')
+    expect((next.messages[0].data as { arc_alignment: string })?.arc_alignment).toBe('strong')
+  })
+
+  it('attaches full_text from the original message content', () => {
+    const originalContent = 'You are a strong fit...'
+    const state = buildState({
+      messages: [buildMessage({ role: 'assistant', type: 'text', content: originalContent })],
+    })
+    const next = applyStepComplete(state, 'assessed', assessmentData)
+    expect((next.messages[0].data as { full_text: string })?.full_text).toBe(originalContent)
+  })
+
+  it('does not promote if data is missing', () => {
+    const state = buildState({
+      messages: [buildMessage({ role: 'assistant', type: 'text' })],
+    })
+    const next = applyStepComplete(state, 'assessed', undefined)
+    expect(next.messages[0].type).toBe('text')
+  })
+
+  it('sets checkpoint to pursue_or_pass', () => {
+    const state = buildState()
+    const next = applyStepComplete(state, 'assessed', assessmentData)
+    expect(next.checkpoint).toBe('pursue_or_pass')
+  })
+
+  it('sets currentStep to assessed', () => {
+    const state = buildState()
+    const next = applyStepComplete(state, 'assessed', assessmentData)
+    expect(next.currentStep).toBe('assessed')
+  })
+})
+
+// ─── not_pursuing ─────────────────────────────────────────────────────────────
+
+describe('not_pursuing', () => {
+  it('sets currentStep and clears checkpoint', () => {
+    const state = buildState({ checkpoint: 'pursue_or_pass' })
+    const next = applyStepComplete(state, 'not_pursuing')
+    expect(next.currentStep).toBe('not_pursuing')
+    expect(next.checkpoint).toBeNull()
+  })
+})
+
+// ─── targeted ─────────────────────────────────────────────────────────────────
+
+describe('targeted', () => {
+  const targetingData = {
+    targeting: {
+      role: 'Software Engineer',
+      scope: ['r0'],
+      rewrites: [
+        { bullet_id: 'r0-b0', original: 'old', rewritten: 'new', objective: 'impact', structure: 'CAR', unquantified: false },
+        { bullet_id: 'r0-b1', original: 'old2', rewritten: 'new2', objective: 'impact', structure: 'CAR', unquantified: true },
+      ],
+      flagged_for_removal: [],
+      credibility_check: { throughline: 'strong', notes: '' },
+    },
+    resume: { name: 'Test User', experience: [], education: [] },
+  }
+
+  it('opens diff view and stores targeting + resume data', () => {
+    const state = buildState()
+    const next = applyStepComplete(state, 'targeted', targetingData)
+    expect(next.showDiffView).toBe(true)
+    expect(next.targetingData).toEqual(targetingData.targeting)
+    expect(next.resumeData).toEqual(targetingData.resume)
+  })
+
+  it('sets unreviewedCount to number of rewrites', () => {
+    const state = buildState()
+    const next = applyStepComplete(state, 'targeted', targetingData)
+    expect(next.unreviewedCount).toBe(2)
+  })
+
+  it('clears checkpoint', () => {
+    const state = buildState({ checkpoint: 'pursue_or_pass' })
+    const next = applyStepComplete(state, 'targeted', targetingData)
+    expect(next.checkpoint).toBeNull()
+  })
+
+  it('handles missing data gracefully', () => {
+    const state = buildState()
+    const next = applyStepComplete(state, 'targeted', undefined)
+    expect(next.showDiffView).toBe(true)
+    expect(next.targetingData).toBeNull()
+    expect(next.resumeData).toBeNull()
+    expect(next.unreviewedCount).toBe(0)
+  })
+})
+
+// ─── exported ─────────────────────────────────────────────────────────────────
+
+describe('exported', () => {
+  it('sets currentStep and closes diff view', () => {
+    const state = buildState({ showDiffView: true })
+    const next = applyStepComplete(state, 'exported')
+    expect(next.currentStep).toBe('exported')
+    expect(next.showDiffView).toBe(false)
+  })
+})
+
+// ─── default / unknown step ───────────────────────────────────────────────────
+
+describe('default (unknown step)', () => {
+  it('sets currentStep without other changes', () => {
+    const state = buildState({ showDiffView: true, checkpoint: 'jd_preview' })
+    const next = applyStepComplete(state, 'abandoned' as CurrentStep)
+    expect(next.currentStep).toBe('abandoned')
+    expect(next.showDiffView).toBe(true)
+    expect(next.checkpoint).toBe('jd_preview')
+  })
+})

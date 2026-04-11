@@ -31,7 +31,7 @@ const initialState: ClientState = {
   error: null,
 }
 
-function applyStepComplete(state: ClientState, step: CurrentStep, data?: unknown): ClientState {
+export function applyStepComplete(state: ClientState, step: CurrentStep, data?: unknown): ClientState {
   switch (step) {
     case 'jd_loaded':
       return { ...state, currentStep: step, checkpoint: 'jd_preview' }

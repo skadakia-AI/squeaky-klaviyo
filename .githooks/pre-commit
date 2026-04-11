@@ -1,0 +1,18 @@
+#!/bin/sh
+
+# 1. Lint
+npm run lint --silent
+
+# 2. Warn if behavior-critical source files changed without any test file changes
+CHANGED=$(git diff --cached --name-only)
+SOURCE_CHANGED=$(echo "$CHANGED" | grep -E 'app/lib/(orchestrator|session|sse)\.|app/lib/(skills|utils)/')
+TEST_CHANGED=$(echo "$CHANGED" | grep 'tests/')
+
+if [ -n "$SOURCE_CHANGED" ] && [ -z "$TEST_CHANGED" ]; then
+  echo ""
+  echo "Warning: behavior files changed with no test updates."
+  echo "Changed files:"
+  echo "$SOURCE_CHANGED" | sed 's/^/  /'
+  echo ""
+  echo "Add or update tests, or run 'git commit --no-verify' to bypass this warning."
+fi

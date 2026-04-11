@@ -111,6 +111,34 @@ export interface StoredMessage {
   created_at: string
 }
 
+// ─── Intent classification ────────────────────────────────────────────────────
+
+// A decision context maps to a specific point where the orchestrator needs to
+// know what the user is trying to do. One context per actual decision point —
+// not one per state machine step (assessed has three sub-states, each is its
+// own context).
+export type IntentContext =
+  | 'jd_loaded'               // "Does this look right?"
+  | 'resume_loaded'            // arc snapshot confirmation
+  | 'assessed_pursue_or_pass'  // "Want to target your resume, or pass?"
+  | 'assessed_scope'           // "Does this scope work?"
+  | 'assessed_numbers'         // "I need a few numbers from you"
+
+export type StepAction =
+  | 'confirm'           // user agrees / wants to proceed
+  | 'reject'            // user wants to re-enter / go back
+  | 'pass'              // user does not want to pursue this role
+  | 'scope_confirm'     // user agrees with the proposed targeting scope
+  | 'scope_add'         // user wants to adjust which roles are in scope
+  | 'numbers_response'  // user is responding to the quantification request
+  | 'chat'              // user is asking a question or being conversational
+  | 'unclear'           // genuinely ambiguous — cannot determine intent
+
+export type StepIntent = {
+  action: StepAction
+  confidence: 'high' | 'low'
+}
+
 // ─── Session / step ───────────────────────────────────────────────────────────
 
 export type CurrentStep =
