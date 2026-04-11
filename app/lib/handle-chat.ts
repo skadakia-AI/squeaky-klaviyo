@@ -15,6 +15,7 @@ type ChatEmit = (event:
 
 const PENDING_REMINDERS: Record<IntentContext, string> = {
   jd_loaded:               'When you\'re ready — does that job description look right?',
+  decoded:                 'When you\'re ready — upload your resume or paste it here.',
   resume_loaded:           'When you\'re ready — does that career arc snapshot look accurate?',
   assessed_pursue_or_pass: 'Whenever you\'d like to continue — do you want to target your resume for this role, or pass on it?',
   assessed_scope:          'Whenever you\'re ready — does that targeting scope work, or would you like to adjust it?',
@@ -23,7 +24,7 @@ const PENDING_REMINDERS: Record<IntentContext, string> = {
 
 // ─── System prompt ────────────────────────────────────────────────────────────
 
-const SYSTEM_PROMPT = `You are an assistant helping someone target their resume for a specific job opening.
+const BASE_SYSTEM_PROMPT = `You are an assistant helping someone target their resume for a specific job opening.
 
 Answer questions about the resume targeting process — things like what arc alignment means, why you're asking for certain information, what a verdict label indicates, or how the targeting works. You can also briefly acknowledge how the user is feeling about a role or their candidacy.
 
@@ -32,6 +33,11 @@ Stay within this scope. If the user asks about something outside resume targetin
 
 Keep responses brief: 1–3 sentences. Do not ask follow-up questions.`
 
+function buildSystemPrompt(artifactContext: string): string {
+  if (!artifactContext.trim()) return BASE_SYSTEM_PROMPT
+  return `${BASE_SYSTEM_PROMPT}\n\n## Session context\n${artifactContext}`
+}
+
 // ─── Handler ──────────────────────────────────────────────────────────────────
 
 export async function handleChat(
@@ -39,6 +45,7 @@ export async function handleChat(
   userId: string,
   userMessage: string,
   context: IntentContext | null,
+  artifactContext: string,
   emit: ChatEmit
 ): Promise<void> {
   let reply = ''
@@ -47,7 +54,7 @@ export async function handleChat(
     const stream = anthropic.messages.stream({
       model: MODELS.analysis,
       max_tokens: 256,
-      system: SYSTEM_PROMPT,
+      system: buildSystemPrompt(artifactContext),
       messages: [{ role: 'user', content: userMessage }],
     })
 

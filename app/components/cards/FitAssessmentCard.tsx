@@ -48,7 +48,7 @@ export default function FitAssessmentCard({ data, content, onChoice, disabled }:
         style={{ borderTop: '1px solid #E5E7EB', backgroundColor: '#F9FAFB' }}
       >
         <button
-          onClick={() => onChoice('yes, proceed')}
+          onClick={() => onChoice('confirm')}
           disabled={disabled}
           className="px-4 py-2 text-sm font-medium rounded"
           style={{

@@ -10,6 +10,7 @@ import { runJDMatchTurn1, runJDMatchTurn2 } from './skills/jd-match'
 import { runResumeTargetingTurn1, runResumeTargetingTurn2 } from './skills/resume-targeting'
 import { classifyIntent } from './intent-decoder'
 import { handleChat } from './handle-chat'
+import { resolveSessionContext } from './utils/session-context'
 import type { CurrentStep, Resume, IntentContext, StepAction } from './types'
 
 export type OrchestratorEvent =
@@ -21,7 +22,7 @@ export type OrchestratorEvent =
   | { type: 'done' }
 
 type InboundMessage = {
-  type: 'text' | 'file_upload'
+  type: 'text' | 'file_upload' | 'checkpoint'
   content: string
   file_name?: string
   file_type?: string
@@ -44,17 +45,21 @@ export async function runOrchestrator(
   // or intent is unclear, respond conversationally and return without advancing.
 
   const SKIP_CLASSIFICATION = new Set<CurrentStep>([
-    'created', 'decoded', 'targeted', 'exported', 'not_pursuing', 'abandoned',
+    'created', 'targeted', 'exported', 'not_pursuing', 'abandoned',
   ])
 
   let resolvedAction: StepAction | null = null
 
-  if (message.type !== 'file_upload' && !SKIP_CLASSIFICATION.has(currentStep)) {
+  if (message.type === 'checkpoint') {
+    // Button clicks carry their action directly — no classification needed
+    resolvedAction = message.content as StepAction
+  } else if (message.type !== 'file_upload' && !SKIP_CLASSIFICATION.has(currentStep)) {
     const context = await resolveIntentContext(sessionId, currentStep)
     if (context) {
       const intent = await classifyIntent(context, message.content)
       if (intent.action === 'chat' || intent.action === 'unclear') {
-        await handleChat(sessionId, userId, message.content, context, emit)
+        const artifactContext = await resolveSessionContext(userId, sessionId)
+        await handleChat(sessionId, userId, message.content, context, artifactContext, emit)
         return
       }
       resolvedAction = intent.action
@@ -374,6 +379,7 @@ async function handleExport(
 async function resolveIntentContext(sessionId: string, step: CurrentStep): Promise<IntentContext | null> {
   switch (step) {
     case 'jd_loaded':    return 'jd_loaded'
+    case 'decoded':      return 'decoded'
     case 'resume_loaded': return 'resume_loaded'
     case 'assessed': {
       const messages = await fetchMessages(sessionId, 'assessed')

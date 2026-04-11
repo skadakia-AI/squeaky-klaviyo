@@ -48,7 +48,7 @@ describe('token streaming', () => {
   it('emits token events for each chunk', async () => {
     mockStream('Arc ', 'alignment ', 'means...')
     const events: EmittedEvent[] = []
-    await handleChat('s-1', 'u-1', 'what is arc alignment?', 'jd_loaded', (e) => events.push(e as EmittedEvent))
+    await handleChat('s-1', 'u-1', 'what is arc alignment?', 'jd_loaded', '', (e) => events.push(e as EmittedEvent))
 
     const tokens = events.filter(e => e.type === 'token') as { type: 'token'; content: string }[]
     expect(tokens).toHaveLength(3)
@@ -58,7 +58,7 @@ describe('token streaming', () => {
   it('emits tokens in order', async () => {
     mockStream('first', ' second', ' third')
     const events: EmittedEvent[] = []
-    await handleChat('s-1', 'u-1', 'explain something', null, (e) => events.push(e as EmittedEvent))
+    await handleChat('s-1', 'u-1', 'explain something', null, '', (e) => events.push(e as EmittedEvent))
 
     const tokens = events.filter(e => e.type === 'token') as { type: 'token'; content: string }[]
     expect(tokens[0].content).toBe('first')
@@ -72,14 +72,14 @@ describe('token streaming', () => {
 describe('message storage', () => {
   it('stores the completed reply as an assistant message', async () => {
     mockStream('Hello ', 'there.')
-    await handleChat('s-1', 'u-1', 'hi', null, () => {})
+    await handleChat('s-1', 'u-1', 'hi', null, '', () => {})
 
     expect(vi.mocked(storeMessage)).toHaveBeenCalledWith('s-1', 'assistant', 'Hello there.', 'chat')
   })
 
   it('does not store a message when the stream returns nothing', async () => {
     mockStream()
-    await handleChat('s-1', 'u-1', 'hi', null, () => {})
+    await handleChat('s-1', 'u-1', 'hi', null, '', () => {})
 
     expect(vi.mocked(storeMessage)).not.toHaveBeenCalled()
   })
@@ -91,7 +91,7 @@ describe('pending reminder', () => {
   it('appends a reminder message when context is provided', async () => {
     mockStream('Good question.')
     const events: EmittedEvent[] = []
-    await handleChat('s-1', 'u-1', 'what does sparse mean?', 'jd_loaded', (e) => events.push(e as EmittedEvent))
+    await handleChat('s-1', 'u-1', 'what does sparse mean?', 'jd_loaded', '', (e) => events.push(e as EmittedEvent))
 
     const messages = events.filter(e => e.type === 'message') as { type: 'message'; content: string }[]
     expect(messages).toHaveLength(1)
@@ -101,17 +101,18 @@ describe('pending reminder', () => {
   it('appends the correct reminder for each context', async () => {
     const contexts: Array<{ context: Parameters<typeof handleChat>[3]; keyword: string }> = [
       { context: 'jd_loaded',               keyword: 'job description' },
-      { context: 'resume_loaded',            keyword: 'arc snapshot' },
-      { context: 'assessed_pursue_or_pass',  keyword: 'target' },
-      { context: 'assessed_scope',           keyword: 'scope' },
-      { context: 'assessed_numbers',         keyword: 'numbers' },
+      { context: 'decoded',                  keyword: 'resume'          },
+      { context: 'resume_loaded',            keyword: 'arc snapshot'    },
+      { context: 'assessed_pursue_or_pass',  keyword: 'target'          },
+      { context: 'assessed_scope',           keyword: 'scope'           },
+      { context: 'assessed_numbers',         keyword: 'numbers'         },
     ]
 
     for (const { context, keyword } of contexts) {
       vi.clearAllMocks()
       mockStream('Response.')
       const events: EmittedEvent[] = []
-      await handleChat('s-1', 'u-1', 'question', context, (e) => events.push(e as EmittedEvent))
+      await handleChat('s-1', 'u-1', 'question', context, '', (e) => events.push(e as EmittedEvent))
 
       const messages = events.filter(e => e.type === 'message') as { type: 'message'; content: string }[]
       expect(messages).toHaveLength(1)
@@ -122,7 +123,7 @@ describe('pending reminder', () => {
   it('does not append a reminder when context is null', async () => {
     mockStream('Response.')
     const events: EmittedEvent[] = []
-    await handleChat('s-1', 'u-1', 'question', null, (e) => events.push(e as EmittedEvent))
+    await handleChat('s-1', 'u-1', 'question', null, '', (e) => events.push(e as EmittedEvent))
 
     const messages = events.filter(e => e.type === 'message')
     expect(messages).toHaveLength(0)
@@ -131,13 +132,34 @@ describe('pending reminder', () => {
   it('reminder comes after the streamed tokens, not before', async () => {
     mockStream('The answer is...')
     const events: EmittedEvent[] = []
-    await handleChat('s-1', 'u-1', 'explain arc alignment', 'resume_loaded', (e) => events.push(e as EmittedEvent))
+    await handleChat('s-1', 'u-1', 'explain arc alignment', 'resume_loaded', '', (e) => events.push(e as EmittedEvent))
 
     const lastToken = [...events].reverse().find(e => e.type === 'token')
     const reminder = events.find(e => e.type === 'message')
     const lastTokenIdx = events.lastIndexOf(lastToken!)
     const reminderIdx = events.indexOf(reminder!)
     expect(reminderIdx).toBeGreaterThan(lastTokenIdx)
+  })
+})
+
+// ─── Artifact context ─────────────────────────────────────────────────────────
+
+describe('artifact context', () => {
+  it('injects artifact context into the system prompt when provided', async () => {
+    mockStream('Response.')
+    await handleChat('s-1', 'u-1', 'question', 'decoded', '## Decoded Job Description\nLead PM role...', () => {})
+
+    const call = vi.mocked(anthropic.messages.stream).mock.calls[0][0]
+    expect(call.system).toContain('## Decoded Job Description')
+    expect(call.system).toContain('Lead PM role...')
+  })
+
+  it('does not add artifact context section when artifactContext is empty', async () => {
+    mockStream('Response.')
+    await handleChat('s-1', 'u-1', 'question', 'decoded', '', () => {})
+
+    const call = vi.mocked(anthropic.messages.stream).mock.calls[0][0]
+    expect(call.system).not.toContain('## Session context')
   })
 })
 
@@ -149,7 +171,7 @@ describe('error handling', () => {
       throw new Error('API error')
     })
     const events: EmittedEvent[] = []
-    await handleChat('s-1', 'u-1', 'question', 'jd_loaded', (e) => events.push(e as EmittedEvent))
+    await handleChat('s-1', 'u-1', 'question', 'jd_loaded', '', (e) => events.push(e as EmittedEvent))
 
     const error = events.find(e => e.type === 'error') as { type: 'error'; code: string } | undefined
     expect(error).toBeDefined()
@@ -161,7 +183,7 @@ describe('error handling', () => {
       throw new Error('API error')
     })
     const events: EmittedEvent[] = []
-    await handleChat('s-1', 'u-1', 'question', 'jd_loaded', (e) => events.push(e as EmittedEvent))
+    await handleChat('s-1', 'u-1', 'question', 'jd_loaded', '', (e) => events.push(e as EmittedEvent))
 
     expect(vi.mocked(storeMessage)).not.toHaveBeenCalled()
     expect(events.filter(e => e.type === 'message')).toHaveLength(0)

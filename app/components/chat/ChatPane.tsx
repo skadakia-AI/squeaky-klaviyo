@@ -111,7 +111,7 @@ export default function ChatPane({ session }: ChatPaneProps) {
             onAccept={acceptBullet}
             onReject={rejectBullet}
             onEdit={editBullet}
-            onCheckpointChoice={(val) => sendMessage({ type: 'text', content: val })}
+            onCheckpointChoice={(val) => sendMessage({ type: 'checkpoint', content: val })}
           />
           <div ref={bottomRef} />
         </div>
@@ -119,7 +119,7 @@ export default function ChatPane({ session }: ChatPaneProps) {
 
       {/* Bottom bar: checkpoint buttons or text input */}
       {checkpoint === 'jd_preview' ? (
-        <CheckpointButtons type="jd_preview" onChoice={(val) => sendMessage({ type: 'text', content: val })} disabled={isStreaming} />
+        <CheckpointButtons type="jd_preview" onChoice={(val) => sendMessage({ type: 'checkpoint', content: val })} disabled={isStreaming} />
       ) : showInput ? (
         <InputArea placeholder={getPlaceholder()} disabled={isStreaming} onSend={handleSend} />
       ) : null}

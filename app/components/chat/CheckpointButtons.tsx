@@ -6,11 +6,11 @@ interface CheckpointButtonsProps {
 
 const BUTTONS = {
   jd_preview: [
-    { label: 'This is the right JD — continue', value: 'y', primary: true },
-    { label: 'Re-enter', value: 'n', primary: false },
+    { label: 'This is the right JD — continue', value: 'confirm', primary: true },
+    { label: 'Re-enter', value: 'reject', primary: false },
   ],
   pursue_or_pass: [
-    { label: 'Target my resume', value: 'yes, proceed', primary: true },
+    { label: 'Target my resume', value: 'confirm', primary: true },
     { label: 'Pass on this role', value: 'pass', primary: false },
   ],
 }

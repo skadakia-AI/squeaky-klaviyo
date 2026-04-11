@@ -16,10 +16,20 @@ const CONTEXT_CONFIGS: Record<IntentContext, ContextConfig> = {
     pendingPrompt: '"Does this look right?" (reviewing a job description preview)',
     validActions: ['confirm', 'reject', 'chat', 'unclear'],
     actionDescriptions: {
-      confirm: 'user agrees the job description looks correct and wants to proceed',
-      reject:  'user says it is wrong or wants to re-enter the job description',
+      confirm: 'user agrees the job description looks correct and wants to proceed (e.g., "y", "yes", "yep", "looks right", "correct", "that\'s it", "looks good")',
+      reject:  'user says it is wrong or wants to re-enter the job description (e.g., "no", "n", "wrong job", "that\'s not right")',
       chat:    'user is asking a question or making a conversational comment',
       unclear: 'cannot determine intent from the message',
+    },
+  },
+
+  decoded: {
+    pendingPrompt: '"Upload your resume or paste it here."',
+    validActions: ['resume_submit', 'chat', 'unclear'],
+    actionDescriptions: {
+      resume_submit: 'user is submitting their resume as pasted text — structured work history, job titles, dates, bullet points',
+      chat:          'user is asking a question or making a comment about the decoded job description',
+      unclear:       'cannot determine intent from the message',
     },
   },
 
@@ -27,7 +37,7 @@ const CONTEXT_CONFIGS: Record<IntentContext, ContextConfig> = {
     pendingPrompt: '"Does this career arc snapshot look accurate?" (reviewing a summary of their background)',
     validActions: ['confirm', 'chat', 'unclear'],
     actionDescriptions: {
-      confirm: 'user confirms the arc snapshot is accurate, possibly with corrections or additions',
+      confirm: 'user confirms the arc snapshot is accurate, possibly with corrections or additions (e.g., "yes", "looks right", "accurate", "that\'s correct")',
       chat:    'user is asking a question or making a conversational comment',
       unclear: 'cannot determine intent from the message',
     },
@@ -37,8 +47,8 @@ const CONTEXT_CONFIGS: Record<IntentContext, ContextConfig> = {
     pendingPrompt: '"Want to target your resume for this role, or pass on this one?"',
     validActions: ['confirm', 'pass', 'chat', 'unclear'],
     actionDescriptions: {
-      confirm: 'user wants to proceed with targeting their resume for this role',
-      pass:    'user does not want to pursue this role',
+      confirm: 'user wants to proceed with targeting their resume for this role (e.g., "yes", "let\'s do it", "target it", "go ahead")',
+      pass:    'user does not want to pursue this role (e.g., "pass", "no", "not interested", "skip it")',
       chat:    'user is asking a question or making a conversational comment',
       unclear: 'cannot determine intent from the message',
     },
@@ -48,8 +58,8 @@ const CONTEXT_CONFIGS: Record<IntentContext, ContextConfig> = {
     pendingPrompt: '"Does this targeting scope work, or do you want to include other roles?"',
     validActions: ['scope_confirm', 'scope_add', 'chat', 'unclear'],
     actionDescriptions: {
-      scope_confirm: 'user agrees with the proposed set of roles to rewrite',
-      scope_add:     'user wants to add or change which roles are included in the rewrite',
+      scope_confirm: 'user agrees with the proposed set of roles to rewrite (e.g., "yes", "looks good", "that works", "go ahead")',
+      scope_add:     'user wants to add or change which roles are included in the rewrite (e.g., "also include X", "add my internship", "include all roles")',
       chat:          'user is asking a question or making a conversational comment',
       unclear:       'cannot determine intent from the message',
     },
@@ -76,7 +86,10 @@ Respond with JSON only — no explanation, no markdown:
 {"action": "<action>", "confidence": "high" | "low"}
 
 Use "low" confidence when the message is genuinely ambiguous. \
-Default to "high" when the intent is reasonably clear.`
+Default to "high" when the intent is reasonably clear.
+
+Important: short affirmatives like "y", "yes", "yep", "yeah", "sure", "ok", "looks good", \
+"correct", "that's right" are valid confirm signals — do not treat them as unclear or chat.`
 
 export async function classifyIntent(
   context: IntentContext,

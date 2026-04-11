@@ -56,6 +56,10 @@ vi.mock('../../app/lib/handle-chat', () => ({
   handleChat: vi.fn().mockResolvedValue(undefined),
 }))
 
+vi.mock('../../app/lib/utils/session-context', () => ({
+  resolveSessionContext: vi.fn().mockResolvedValue(''),
+}))
+
 // ─── Imports (after mocks are registered) ────────────────────────────────────
 
 import { runOrchestrator } from '../../app/lib/orchestrator'
@@ -70,6 +74,7 @@ import { runJDMatchTurn1, runJDMatchTurn2 } from '../../app/lib/skills/jd-match'
 import { runResumeTargetingTurn1, runResumeTargetingTurn2 } from '../../app/lib/skills/resume-targeting'
 import { classifyIntent } from '../../app/lib/intent-decoder'
 import { handleChat } from '../../app/lib/handle-chat'
+import { resolveSessionContext } from '../../app/lib/utils/session-context'
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -556,6 +561,25 @@ describe('chat bypass', () => {
 
     expect(vi.mocked(handleChat)).toHaveBeenCalled()
     expect(vi.mocked(runJDMatchTurn2)).not.toHaveBeenCalled()
+  })
+
+  it('calls resolveSessionContext before handleChat and passes the result', async () => {
+    vi.mocked(classifyIntent).mockResolvedValue({ action: 'chat', confidence: 'high' })
+    vi.mocked(resolveSessionContext).mockResolvedValue('## Decoded Job Description\nLead PM role...')
+
+    await run(
+      { type: 'text', content: 'tell me more about this role' },
+      makeSession({ current_step: 'jd_loaded' })
+    )
+
+    expect(vi.mocked(resolveSessionContext)).toHaveBeenCalledWith(USER_ID, SESSION_ID)
+    expect(vi.mocked(handleChat)).toHaveBeenCalledWith(
+      SESSION_ID, USER_ID,
+      'tell me more about this role',
+      'jd_loaded',
+      '## Decoded Job Description\nLead PM role...',
+      expect.any(Function)
+    )
   })
 
   it('skips classification for file uploads and routes directly', async () => {

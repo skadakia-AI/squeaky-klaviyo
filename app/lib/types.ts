@@ -77,7 +77,7 @@ export interface CredibilityCheck {
 // ─── SSE / API wire types ─────────────────────────────────────────────────────
 
 export type OutboundMessage = {
-  type: 'text' | 'file_upload'
+  type: 'text' | 'file_upload' | 'checkpoint'
   content: string
   file_name?: string
   file_type?: string
@@ -119,6 +119,7 @@ export interface StoredMessage {
 // own context).
 export type IntentContext =
   | 'jd_loaded'               // "Does this look right?"
+  | 'decoded'                  // "Upload your resume or paste it here"
   | 'resume_loaded'            // arc snapshot confirmation
   | 'assessed_pursue_or_pass'  // "Want to target your resume, or pass?"
   | 'assessed_scope'           // "Does this scope work?"
@@ -131,6 +132,7 @@ export type StepAction =
   | 'scope_confirm'     // user agrees with the proposed targeting scope
   | 'scope_add'         // user wants to adjust which roles are in scope
   | 'numbers_response'  // user is responding to the quantification request
+  | 'resume_submit'     // user is submitting resume text (decoded step)
   | 'chat'              // user is asking a question or being conversational
   | 'unclear'           // genuinely ambiguous — cannot determine intent
 
