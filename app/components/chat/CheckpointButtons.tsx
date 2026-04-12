@@ -1,5 +1,5 @@
 interface CheckpointButtonsProps {
-  type: 'arc_confirmation' | 'pursue_or_pass'
+  type: 'arc_confirmation' | 'pursue_or_pass' | 'scope_selection'
   onChoice: (value: string) => void
   disabled: boolean
 }
@@ -12,6 +12,10 @@ const BUTTONS = {
   pursue_or_pass: [
     { label: 'Target my resume', value: 'confirm', primary: true },
     { label: 'Pass on this role', value: 'pass', primary: false },
+  ],
+  scope_selection: [
+    { label: 'This scope works', value: 'scope_confirm', primary: true },
+    { label: 'Adjust scope', value: 'adjust', primary: false },
   ],
 }
 

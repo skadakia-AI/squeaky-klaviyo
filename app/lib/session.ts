@@ -32,13 +32,24 @@ const initialState: ClientState = {
 }
 
 export function applyDone(state: ClientState): ClientState {
-  return {
-    ...state,
-    isStreaming: false,
-    checkpoint: state.currentStep === 'resume_loaded' && !state.error
-      ? 'arc_confirmation'
-      : state.checkpoint,
+  let checkpoint = state.checkpoint
+
+  if (!state.error) {
+    if (state.currentStep === 'resume_loaded') {
+      checkpoint = 'arc_confirmation'
+    } else if (state.currentStep === 'assessed') {
+      // Scope was just proposed — last assistant text message is the scope proposal.
+      // Distinct from Turn 1 (which runs bullet audit, not a scope question).
+      const lastAssistant = [...state.messages]
+        .reverse()
+        .find(m => m.role === 'assistant' && m.type === 'text')
+      if (lastAssistant?.content.includes("I'll rewrite")) {
+        checkpoint = 'scope_selection'
+      }
+    }
   }
+
+  return { ...state, isStreaming: false, checkpoint }
 }
 
 export function applyStepComplete(state: ClientState, step: CurrentStep, data?: unknown): ClientState {

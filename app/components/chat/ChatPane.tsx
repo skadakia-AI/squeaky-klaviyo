@@ -131,6 +131,15 @@ export default function ChatPane({ session }: ChatPaneProps) {
           }}
           disabled={isStreaming}
         />
+      ) : checkpoint === 'scope_selection' ? (
+        <CheckpointButtons
+          type="scope_selection"
+          onChoice={(val) => {
+            if (val === 'adjust') { clearCheckpoint() }
+            else sendMessage({ type: 'checkpoint', content: val })
+          }}
+          disabled={isStreaming}
+        />
       ) : showInput ? (
         <InputArea placeholder={getPlaceholder()} disabled={isStreaming} onSend={handleSend} />
       ) : null}

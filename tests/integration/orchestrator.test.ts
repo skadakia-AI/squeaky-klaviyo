@@ -412,6 +412,27 @@ describe('assessed step', () => {
     expect(vi.mocked(runResumeTargetingTurn1)).not.toHaveBeenCalled()
   })
 
+  it('scope confirm via checkpoint button bypasses classifier and runs Turn 1', async () => {
+    const scopeMessage = { role: 'assistant' as const, content: "I'll rewrite Software Engineer at Acme Corp." }
+    vi.mocked(fetchMessages).mockResolvedValue([scopeMessage])
+    vi.mocked(runResumeTargetingTurn1).mockResolvedValue({ success: true, turn1Text: 'Bullet audit...', needsNumbers: false })
+    vi.mocked(runResumeTargetingTurn2).mockResolvedValue({
+      success: true,
+      targetingOutput: { rewrites: [], flagged_for_removal: [] },
+      bulletCount: 0,
+      resume: mockResume,
+    })
+    vi.mocked(readFile).mockResolvedValue(JSON.stringify(mockResume))
+
+    await run(
+      { type: 'checkpoint', content: 'scope_confirm' },
+      makeSession({ current_step: 'assessed', arc_alignment: 'strong' })
+    )
+
+    expect(vi.mocked(classifyIntent)).not.toHaveBeenCalled()
+    expect(vi.mocked(runResumeTargetingTurn1)).toHaveBeenCalled()
+  })
+
   it('runs Turn 1 after scope is proposed and confirmed', async () => {
     vi.mocked(classifyIntent).mockResolvedValue({ action: 'scope_confirm', confidence: 'high' })
     const scopeMessage = { role: 'assistant' as const, content: "I'll rewrite Software Engineer at Acme Corp." }

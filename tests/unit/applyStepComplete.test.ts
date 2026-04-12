@@ -245,8 +245,41 @@ describe('applyDone', () => {
     expect(next.checkpoint).toBeNull()
   })
 
-  it('preserves existing checkpoint when currentStep is not resume_loaded', () => {
-    const state = buildState({ currentStep: 'assessed', checkpoint: 'pursue_or_pass', isStreaming: true })
+  it('sets scope_selection checkpoint when currentStep is assessed and last assistant message is scope proposal', () => {
+    const state = buildState({
+      currentStep: 'assessed',
+      isStreaming: true,
+      error: null,
+      messages: [buildMessage({ role: 'assistant', type: 'text', content: "I'll rewrite Senior PM at Acme. Want to include any other roles, or does this scope work?" })],
+    })
+    const next = applyDone(state)
+    expect(next.checkpoint).toBe('scope_selection')
+  })
+
+  it('does not set scope_selection when currentStep is assessed but last assistant message is not scope proposal', () => {
+    const state = buildState({
+      currentStep: 'assessed',
+      isStreaming: true,
+      error: null,
+      messages: [buildMessage({ role: 'assistant', type: 'text', content: 'Before I rewrite, can you share some numbers?' })],
+    })
+    const next = applyDone(state)
+    expect(next.checkpoint).toBeNull()
+  })
+
+  it('does not set scope_selection when currentStep is assessed but there is an error', () => {
+    const state = buildState({
+      currentStep: 'assessed',
+      isStreaming: true,
+      error: { code: 'API_ERROR', message: 'Failed' },
+      messages: [buildMessage({ role: 'assistant', type: 'text', content: "I'll rewrite Senior PM at Acme." })],
+    })
+    const next = applyDone(state)
+    expect(next.checkpoint).toBeNull()
+  })
+
+  it('preserves existing checkpoint when currentStep is not resume_loaded or assessed', () => {
+    const state = buildState({ currentStep: 'decoded', checkpoint: 'pursue_or_pass', isStreaming: true })
     const next = applyDone(state)
     expect(next.checkpoint).toBe('pursue_or_pass')
   })
