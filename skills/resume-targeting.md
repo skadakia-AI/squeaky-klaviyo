@@ -99,7 +99,7 @@ Before rewriting, identify bullets where quantification is needed. Print to the 
 - [bullet text] — [specific question, e.g. 'what was the budget you managed?']
 - [bullet text] — [specific question]
 
-Rough estimates are fine. Skip any you genuinely don't have."
+Rough estimates are fine. Leave blank any you genuinely don't have."
 
 Wait for response before proceeding. If user says skip — proceed and flag those bullets as unquantified.
 

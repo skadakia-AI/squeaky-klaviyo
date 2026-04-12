@@ -33,9 +33,9 @@ Print to the conversation:
 > - [arc bullet]
 > - [arc bullet]
 
-Ask: "Does this capture your background accurately? (y to proceed / n to flag a correction)"
+End with: "Does this capture your background accurately?"
 
-If n → ask what was misread, incorporate the correction, then proceed. Maximum 2 correction rounds.
+If the user flags a correction → ask what was misread, incorporate it, then proceed. Maximum 2 correction rounds.
 
 ---
 

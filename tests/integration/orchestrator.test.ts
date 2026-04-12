@@ -115,6 +115,9 @@ beforeEach(() => {
   // Default: classify as confirm so existing routing tests fall through to step handlers.
   // Override in individual tests that need a different intent.
   vi.mocked(classifyIntent).mockResolvedValue({ action: 'confirm', confidence: 'high' })
+  // Reset fetchMessages to empty — clearAllMocks() clears call history but not mock
+  // implementations, so tests that set a non-empty return value would leak into later tests.
+  vi.mocked(fetchMessages).mockResolvedValue([])
 })
 
 // ─── created step ─────────────────────────────────────────────────────────────
@@ -164,6 +167,16 @@ describe('created step', () => {
     )
     expect(events.some(e => e.type === 'step_complete' && e.step === 'decoded')).toBe(true)
     expect(events.some(e => e.type === 'step_complete' && e.step === 'jd_loaded')).toBe(false)
+  })
+
+  it('does not emit a separate upload-resume message after decode — prompt is in the card footer', async () => {
+    vi.mocked(loadJD).mockResolvedValue({ success: true, rawText: 'Software Engineer...', sparse: false })
+    vi.mocked(runJDDecoder).mockResolvedValue({ success: true, decodedText: '# JD Decoded', roleTitle: 'SWE', company: 'Acme', slug: 'acme-swe' })
+
+    const events = await run({ type: 'text', content: 'some jd text' }, makeSession())
+
+    const textMessages = events.filter(e => e.type === 'message') as Extract<OrchestratorEvent, { type: 'message' }>[]
+    expect(textMessages.some(m => m.content.toLowerCase().includes('upload your resume'))).toBe(false)
   })
 
   it('emits error and does not advance on loadJD failure', async () => {
@@ -492,8 +505,8 @@ describe('assessed step', () => {
     expect(events.some(e => e.type === 'step_complete' && e.step === 'targeted')).toBe(false)
   })
 
-  it('runs Turn 2 when user responds with numbers', async () => {
-    vi.mocked(classifyIntent).mockResolvedValue({ action: 'numbers_response', confidence: 'high' })
+  it('runs Turn 2 when user responds with numbers — classifier is bypassed', async () => {
+    // Numbers sub-state bypasses the intent classifier entirely; any response triggers Turn 2.
     const numbersMessage = { role: 'assistant' as const, content: 'Before I rewrite, I need a few numbers.' }
     vi.mocked(fetchMessages).mockResolvedValue([
       { role: 'assistant' as const, content: "I'll rewrite Software Engineer at Acme Corp." },
@@ -511,6 +524,30 @@ describe('assessed step', () => {
       makeSession({ current_step: 'assessed', arc_alignment: 'strong' })
     )
 
+    expect(vi.mocked(classifyIntent)).not.toHaveBeenCalled()
+    expect(vi.mocked(runResumeTargetingTurn2)).toHaveBeenCalled()
+    expect(events.some(e => e.type === 'step_complete' && e.step === 'targeted')).toBe(true)
+  })
+
+  it('runs Turn 2 when user says "skip" in numbers sub-state — bypasses classifier', async () => {
+    const numbersMessage = { role: 'assistant' as const, content: 'I need numbers to quantify your impact.' }
+    vi.mocked(fetchMessages).mockResolvedValue([
+      { role: 'assistant' as const, content: "I'll rewrite Software Engineer at Acme Corp." },
+      numbersMessage,
+    ])
+    vi.mocked(runResumeTargetingTurn2).mockResolvedValue({
+      success: true,
+      targetingOutput: { rewrites: [], flagged_for_removal: [] },
+      bulletCount: 0,
+      resume: mockResume,
+    })
+
+    const events = await run(
+      { type: 'text', content: 'skip' },
+      makeSession({ current_step: 'assessed', arc_alignment: 'strong' })
+    )
+
+    expect(vi.mocked(classifyIntent)).not.toHaveBeenCalled()
     expect(vi.mocked(runResumeTargetingTurn2)).toHaveBeenCalled()
     expect(events.some(e => e.type === 'step_complete' && e.step === 'targeted')).toBe(true)
   })

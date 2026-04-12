@@ -167,6 +167,18 @@ describe('assessed_numbers context', () => {
     expect(result).toEqual({ action: 'numbers_response', confidence: 'high' })
   })
 
+  it('returns numbers_response for "skip for now"', async () => {
+    mockLLMResponse('numbers_response')
+    const result = await classifyIntent('assessed_numbers', 'skip for now')
+    expect(result).toEqual({ action: 'numbers_response', confidence: 'high' })
+  })
+
+  it('returns numbers_response for "just go ahead"', async () => {
+    mockLLMResponse('numbers_response')
+    const result = await classifyIntent('assessed_numbers', 'just go ahead')
+    expect(result).toEqual({ action: 'numbers_response', confidence: 'high' })
+  })
+
   it('returns chat when user asks why numbers are needed', async () => {
     mockLLMResponse('chat')
     const result = await classifyIntent('assessed_numbers', 'why do you need these?')

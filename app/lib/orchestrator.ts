@@ -135,10 +135,6 @@ async function handleDecodeJD(
     role: result.roleTitle,
   })
   emit({ type: 'step_complete', step: 'decoded' })
-
-  const resumePrompt = 'Upload your resume or paste it here.'
-  await storeMessage(sessionId, 'assistant', resumePrompt, 'decoded')
-  emit({ type: 'message', role: 'assistant', content: resumePrompt })
 }
 
 async function handleResumeUpload(
@@ -316,7 +312,7 @@ async function handleAssessed(
 
   // Sub-state 3: Turn 1 ran and asked for numbers — user just responded
   const lastAssistant = assistantMessages[assistantMessages.length - 1]
-  const askedForNumbers = lastAssistant.content.includes('Before I rewrite') || lastAssistant.content.includes('I need a few numbers')
+  const askedForNumbers = !lastAssistant.content.includes('No numbers needed')
 
   if (askedForNumbers) {
     // User's numbers response already stored by runOrchestrator top-level storeMessage
@@ -388,9 +384,11 @@ async function resolveIntentContext(sessionId: string, step: CurrentStep): Promi
         (assistantMessages.length === 1 && !assistantMessages[0].content.includes("I'll rewrite"))
       if (!hasTurn1) return 'assessed_scope'
       const last = assistantMessages[assistantMessages.length - 1]
-      const askedForNumbers = last.content.includes('Before I rewrite') ||
-        last.content.includes('I need a few numbers')
-      return askedForNumbers ? 'assessed_numbers' : 'assessed_pursue_or_pass'
+      const askedForNumbers = !last.content.includes('No numbers needed')
+      // Bypass the classifier when waiting for numbers — any user response triggers Turn 2.
+      // Classifying "skip", "none", "proceed" is unreliable; the sub-state already determines
+      // what to do with the response.
+      return askedForNumbers ? null : 'assessed_pursue_or_pass'
     }
     default: return null
   }

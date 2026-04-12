@@ -69,8 +69,8 @@ const CONTEXT_CONFIGS: Record<IntentContext, ContextConfig> = {
     pendingPrompt: '"Can you provide some numbers or metrics for your bullet points?"',
     validActions: ['numbers_response', 'chat', 'unclear'],
     actionDescriptions: {
-      numbers_response: 'user is providing numbers, metrics, or any response to the quantification request — including saying they do not have exact numbers',
-      chat:             'user is asking a question or making a conversational comment',
+      numbers_response: 'user is responding to the quantification request in any way — providing numbers, saying they don\'t have them, or saying to proceed without them (e.g. "skip", "skip for now", "none", "proceed", "move on", "don\'t have these", "just go ahead", "I don\'t have exact numbers")',
+      chat:             'user is asking a question about why numbers are needed or about the process',
       unclear:          'cannot determine intent from the message',
     },
   },

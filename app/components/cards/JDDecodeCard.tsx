@@ -19,6 +19,12 @@ export default function JDDecodeCard({ content }: JDDecodeCardProps) {
       <div className="px-4 py-3">
         <AssistantMessage content={content} />
       </div>
+      <div
+        className="px-4 py-3 text-sm"
+        style={{ borderTop: '1px solid #E5E7EB', backgroundColor: '#F9FAFB', color: '#6B7280' }}
+      >
+        Upload your resume or paste it below.
+      </div>
     </div>
   )
 }

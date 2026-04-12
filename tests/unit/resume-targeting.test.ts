@@ -1,0 +1,115 @@
+import { vi, describe, it, expect, beforeEach } from 'vitest'
+
+vi.mock('../../app/lib/anthropic', () => ({
+  anthropic: {
+    messages: {
+      stream: vi.fn(),
+      create: vi.fn(),
+    },
+  },
+  MODELS: {
+    analysis: 'claude-sonnet-4-6',
+    parsing: 'claude-haiku-4-5-20251001',
+  },
+}))
+
+vi.mock('../../app/lib/utils/storage', () => ({
+  readFile: vi.fn(),
+  writeFile: vi.fn(),
+  storagePath: vi.fn().mockReturnValue('users/u/s/file'),
+}))
+
+vi.mock('../../app/lib/utils/messages', () => ({
+  storeMessage: vi.fn().mockResolvedValue(undefined),
+  fetchMessages: vi.fn().mockResolvedValue([]),
+}))
+
+vi.mock('../../app/lib/supabase', () => ({
+  getServiceClient: vi.fn().mockReturnValue({
+    from: vi.fn().mockReturnValue({ insert: vi.fn().mockResolvedValue({}) }),
+  }),
+}))
+
+vi.mock('fs', () => ({
+  default: { readFileSync: vi.fn().mockReturnValue('# skill prompt') },
+  readFileSync: vi.fn().mockReturnValue('# skill prompt'),
+}))
+
+vi.mock('path', () => ({
+  default: { join: vi.fn().mockReturnValue('/skills/resume-targeting.md') },
+  join: vi.fn().mockReturnValue('/skills/resume-targeting.md'),
+}))
+
+import { runResumeTargetingTurn1, runResumeTargetingTurn2 } from '../../app/lib/skills/resume-targeting'
+import { anthropic } from '../../app/lib/anthropic'
+import { readFile, writeFile } from '../../app/lib/utils/storage'
+import { fetchMessages } from '../../app/lib/utils/messages'
+
+const SESSION_ID = 'session-123'
+const USER_ID = 'user-456'
+
+async function* makeStream(text: string) {
+  yield { type: 'content_block_delta', delta: { type: 'text_delta', text } }
+}
+
+beforeEach(() => {
+  vi.clearAllMocks()
+  vi.mocked(readFile).mockResolvedValue('{"name":"Test","experience":[],"education":[]}')
+})
+
+describe('runResumeTargetingTurn1', () => {
+  it('includes TURN 1 INSTRUCTION in system prompt', async () => {
+    vi.mocked(anthropic.messages.stream).mockReturnValue(makeStream('No numbers needed — I\'ll start rewriting.') as never)
+
+    await runResumeTargetingTurn1(SESSION_ID, USER_ID, ['r0'], vi.fn())
+
+    const call = vi.mocked(anthropic.messages.stream).mock.calls[0][0]
+    expect(call.system).toContain('TURN 1 INSTRUCTION')
+    expect(call.system).toContain('Steps 1, 2, and 3 ONLY')
+    expect(call.system).toContain('DO NOT proceed to Steps 4, 5, or 6')
+    expect(call.system).toContain('NEVER print bullet IDs')
+  })
+
+  it('returns needsNumbers true when output does not contain the "No numbers needed" confirmation', async () => {
+    // LLM may vary the phrasing of the numbers request; we detect by absence of the controlled phrase
+    vi.mocked(anthropic.messages.stream).mockReturnValue(makeStream('I need numbers to quantify your impact.') as never)
+
+    const result = await runResumeTargetingTurn1(SESSION_ID, USER_ID, ['r0'], vi.fn())
+
+    expect(result.success).toBe(true)
+    if (result.success) expect(result.needsNumbers).toBe(true)
+  })
+
+  it('returns needsNumbers false when output contains "No numbers needed"', async () => {
+    vi.mocked(anthropic.messages.stream).mockReturnValue(makeStream('No numbers needed — I\'ll start rewriting.') as never)
+
+    const result = await runResumeTargetingTurn1(SESSION_ID, USER_ID, ['r0'], vi.fn())
+
+    expect(result.success).toBe(true)
+    if (result.success) expect(result.needsNumbers).toBe(false)
+  })
+})
+
+describe('runResumeTargetingTurn2', () => {
+  const validJson = JSON.stringify({
+    role: 'SWE @ Acme',
+    scope: ['r0'],
+    rewrites: [{ bullet_id: 'r0-b0', original: 'Built things', rewritten: 'Delivered X', objective: 'growth', structure: 'A', unquantified: false }],
+    flagged_for_removal: [],
+    credibility_check: { throughline: 'strong', notes: '' },
+  })
+
+  it('includes TURN 2 INSTRUCTION in system prompt', async () => {
+    vi.mocked(fetchMessages).mockResolvedValue([{ role: 'user', content: 'context' }])
+    vi.mocked(anthropic.messages.create).mockResolvedValue({
+      content: [{ type: 'text', text: `\`\`\`json\n${validJson}\n\`\`\`` }],
+    } as never)
+    vi.mocked(writeFile).mockResolvedValue(undefined)
+
+    await runResumeTargetingTurn2(SESSION_ID, USER_ID)
+
+    const call = vi.mocked(anthropic.messages.create).mock.calls[0][0]
+    expect(call.system).toContain('TURN 2 INSTRUCTION')
+    expect(call.system).toContain('Steps 4, 5, and 6')
+  })
+})

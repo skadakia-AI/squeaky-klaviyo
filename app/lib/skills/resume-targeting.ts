@@ -33,7 +33,17 @@ export async function runResumeTargetingTurn1(
     return { success: false, code: 'STORAGE_ERROR', message: 'Couldn\'t load required context. Please start a new session.' }
   }
 
-  const system = fs.readFileSync(path.join(process.cwd(), 'skills', 'resume-targeting.md'), 'utf-8')
+  const skillText = fs.readFileSync(path.join(process.cwd(), 'skills', 'resume-targeting.md'), 'utf-8')
+  const system = `${skillText}
+
+---
+TURN 1 INSTRUCTION: Execute Steps 1, 2, and 3 ONLY.
+- Build the strategic objectives map internally (do not print)
+- Audit all bullets in scope silently (do not print)
+- If any bullets need quantification, print the numbers request (Step 3 format) and STOP
+- If no numbers are needed, print exactly: "No numbers needed — I'll start rewriting." and STOP
+- DO NOT proceed to Steps 4, 5, or 6. No ORIGINAL/REWRITTEN blocks, no JSON output.
+- NEVER print bullet IDs (e.g. r0-b0, r1-b2) in any output. Reference bullets by their text only.`
   const userMsg = `decoded_jd: ${decodedJD}\nresume: ${resumeStructured}\nscope: ${JSON.stringify(scopeIds)}\nsession_id: ${sessionId}\nuser_id: ${userId}`
 
   let turn1Text = ''
@@ -59,7 +69,10 @@ export async function runResumeTargetingTurn1(
   await storeMessage(sessionId, 'user', userMsg, 'assessed')
   await storeMessage(sessionId, 'assistant', turn1Text, 'assessed')
 
-  const needsNumbers = turn1Text.includes('Before I rewrite') || turn1Text.includes('I need a few numbers')
+  // Detect by absence of the "no numbers" confirmation phrase, which the TURN 1 INSTRUCTION
+  // controls exactly. Checking for specific "needs numbers" phrases is fragile since the
+  // LLM may vary the phrasing while still correctly asking for numbers.
+  const needsNumbers = !turn1Text.includes('No numbers needed')
   return { success: true, turn1Text, needsNumbers }
 }
 
@@ -68,7 +81,14 @@ export async function runResumeTargetingTurn2(
   userId: string
 ): Promise<ResumeTargetingTurn2Result> {
   const messages = await fetchMessages(sessionId, 'assessed')
-  const system = fs.readFileSync(path.join(process.cwd(), 'skills', 'resume-targeting.md'), 'utf-8')
+  const skillText = fs.readFileSync(path.join(process.cwd(), 'skills', 'resume-targeting.md'), 'utf-8')
+  const system = `${skillText}
+
+---
+TURN 2 INSTRUCTION: Execute Steps 4, 5, and 6.
+- Use the conversation history and any numbers the user provided
+- Rewrite all bullets in scope, flag removals, run credibility check
+- Output the JSON format exactly as specified in the Output format section`
 
   let turn2Text: string
   try {
