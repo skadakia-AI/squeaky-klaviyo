@@ -20,7 +20,6 @@ interface BulletRowProps {
 }
 
 export default function BulletRow({
-  bulletId: _bulletId,
   original,
   rewritten,
   objective,

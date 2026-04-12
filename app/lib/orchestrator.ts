@@ -1,4 +1,3 @@
-import { getServiceClient } from './supabase'
 import { readFile } from './utils/storage'
 import { storeMessage, fetchMessages } from './utils/messages'
 import { updateSession } from './utils/update-session'
@@ -332,7 +331,7 @@ async function runTurn2(
 ) {
   emit({ type: 'message', role: 'assistant', content: 'Rewriting bullets...', progress: true })
 
-  const turn2Result = await runResumeTargetingTurn2(sessionId, userId, emit)
+  const turn2Result = await runResumeTargetingTurn2(sessionId, userId)
 
   if (!turn2Result.success) {
     emit({ type: 'error', code: turn2Result.code, message: turn2Result.message })

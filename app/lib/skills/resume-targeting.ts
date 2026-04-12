@@ -65,8 +65,7 @@ export async function runResumeTargetingTurn1(
 
 export async function runResumeTargetingTurn2(
   sessionId: string,
-  userId: string,
-  emit: SkillEmit
+  userId: string
 ): Promise<ResumeTargetingTurn2Result> {
   const messages = await fetchMessages(sessionId, 'assessed')
   const system = fs.readFileSync(path.join(process.cwd(), 'skills', 'resume-targeting.md'), 'utf-8')
