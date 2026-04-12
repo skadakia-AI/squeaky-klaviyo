@@ -49,6 +49,12 @@ A running log of significant design decisions — what was decided, what alterna
 
 ---
 
+### Haiku for intent classification, Sonnet for analysis
+**Decision:** The intent classifier (`classifyIntent` in `intent-decoder.ts`) uses Claude Haiku. All analysis skills (jd-decoder, jd-match, resume-targeting) use Claude Sonnet.
+**Rationale:** Intent classification is a narrow extraction task — given a context description and a user message, return a JSON action label. This requires no reasoning, no domain synthesis, no judgment. Haiku is fast (< 1s) and cheap enough to run on every user message without adding meaningful latency or cost. Sonnet is reserved for tasks requiring nuanced judgment: decoding what a hiring manager actually wants, assessing candidate fit, rewriting resume bullets. Using Sonnet for classification would add cost and latency with no quality benefit.
+
+---
+
 ### Claude Haiku for resume parsing, Sonnet for analysis
 **Decision:** Claude Haiku (`claude-haiku-4-5-20251001`) is used for structured JSON extraction in load-resume. Claude Sonnet 4.6 is used for all analysis skills.
 **Rationale:** Resume parsing is pure extraction — convert text to a matching JSON schema with no inference or judgment. Haiku is fast and cheap enough for this. Sonnet is reserved for where reasoning quality, nuanced judgment, and domain synthesis matter. This split reduces cost per session by roughly 40–50% with no quality impact on analysis outputs.
@@ -56,6 +62,13 @@ A running log of significant design decisions — what was decided, what alterna
 ---
 
 ## Intent Classification
+
+### Checkpoint buttons for high-stakes binary confirmations
+**Decision:** Arc snapshot confirmation and scope confirmation use checkpoint buttons rendered in the UI rather than free-text input classified by the intent classifier. Buttons send `{ type: 'checkpoint', content: 'action_name' }` directly, bypassing the classifier entirely.
+**Alternatives considered:** Classify typed responses ("yes", "looks right", "this scope works") through the intent classifier same as other steps.
+**Rationale:** The classifier is a probabilistic Haiku call. For high-stakes confirmations — "does this arc accurately represent my background?" and "is this the right targeting scope?" — misclassification has real consequences: advancing to assessment with bad context, or targeting the wrong roles. A button click has exact semantics; there is no ambiguity to classify. The pattern also makes the required action explicit to the user rather than relying on them to phrase a response the classifier will read correctly. Any step where the binary choice matters enough that misclassification would corrupt downstream work should use buttons.
+
+---
 
 ### assessed_numbers sub-state bypasses the classifier
 **Decision:** When the orchestrator is waiting for numbers (Turn 1 asked for metrics, user hasn't responded yet), `resolveIntentContext` returns `null` instead of `'assessed_numbers'`, bypassing the intent classifier entirely. Any user message in this sub-state triggers Turn 2 directly.
@@ -70,6 +83,13 @@ A running log of significant design decisions — what was decided, what alterna
 **Decision:** One POST endpoint (`/api/chat/route.ts`) handles all workflow steps, routing by `current_step`.
 **Alternatives considered:** Separate API routes per step (`/api/chat/decode`, `/api/chat/assess`, etc.).
 **Rationale:** A single endpoint keeps the client simple (one SSE connection per user action) and session state coherent. Separate routes would require the client to know which endpoint to call at each step — coupling UI to server routing logic. The state machine belongs on the server.
+
+---
+
+### JD load and decode run in one shot — no confirmation step
+**Decision:** After the user submits a job description, the system loads it and decodes it immediately without stopping to confirm the extracted text. `jd_loaded` exists as a state in the database only as a recovery checkpoint — the orchestrator passes through it automatically.
+**Alternatives considered:** Show the raw extracted JD text and ask the user to confirm before decoding; allow editing of the raw text.
+**Rationale:** The decoded JD is the artifact with value — the raw extracted text is an intermediate. Showing it adds a step with no benefit: users are not equipped to evaluate whether the raw extraction is complete or correct, and the decoder handles noisy input well. If the source content was wrong (wrong URL, wrong PDF), the decoded output makes that obvious and the user can start a new session. `jd_loaded` is retained as a DB state so that a session interrupted between load and decode can resume automatically on next request rather than losing the fetched content.
 
 ---
 
@@ -106,6 +126,12 @@ A running log of significant design decisions — what was decided, what alterna
 **Decision:** Exported `.docx` uses a fixed standard template. Does not replicate the user's original resume formatting.
 **Alternatives considered:** Round-trip formatting using docxtemplater; preserve original layout.
 **Rationale:** PDF/DOCX → text → DOCX conversion loses structural information and produces inconsistent results. A clean standard template is more professional and predictable. The value delivered is the rewritten content — users apply their own styling in Word.
+
+---
+
+### raw_jd.md excluded from handleChat session context
+**Decision:** When `resolveSessionContext` assembles artifacts to inject into `handleChat`, it includes `decoded_jd.md`, `resume_main.md`, and `fit_assessment.md` — but never `raw_jd.md`.
+**Rationale:** Two reasons. First, `decoded_jd.md` supersedes `raw_jd.md` the moment it exists — the decoded version is structured, synthesized, and far more useful for answering questions about the role. Including both would be redundant and wasteful on context. Second, before the decode step runs, `raw_jd.md` may be very large (full job posting HTML or PDF text) and unstructured — injecting it into a chat context would push useful content out of the window without adding value. If no decoded JD exists yet (e.g., decode failed), the chat handler simply operates without role context, which is the correct behavior.
 
 ---
 
