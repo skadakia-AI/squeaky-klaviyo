@@ -24,7 +24,7 @@ Do not mark a coding task complete without verifying the test suite covers the n
 
 A chat-driven web app that decodes job descriptions, assesses resume fit, and rewrites resume bullets. Users download a targeted `.docx`. Built on Next.js App Router, Clerk auth, Supabase (Postgres + Storage), Anthropic API.
 
-Full spec: `docs/mvp_build_spec.md`. Architecture detail: `docs/architecture.md`.
+Full spec: `docs/mvp_build_spec.md`. Architecture detail: `docs/architecture.md`. Runtime behavior: `docs/system-flow.md`.
 
 ---
 
@@ -49,10 +49,10 @@ Utilities (app/lib/utils/)
 
 ```
 created → jd_loaded → decoded → resume_loaded → assessed → targeted → exported
-                                                          ↘ not_pursuing
+                    ↑ automatic                           ↘ not_pursuing
 ```
 
-`jd_confirmed` is an **SSE-only signal** — never written to the `current_step` database column. The DB goes `jd_loaded → decoded` directly.
+`jd_loaded` is a transient recovery checkpoint — the orchestrator advances through it to `decoded` immediately without waiting for user input. There is no JD confirmation step.
 
 ---
 
@@ -148,8 +148,9 @@ MODELS.parsing  = 'claude-haiku-4-5-20251001'  // load-resume structured extract
 ## Multi-Turn Skill Flow
 
 **jd-match** (step: `resume_loaded`):
-- Turn 1: arc snapshot → user confirms or corrects (checkpoint)
-- Turn 2: full assessment with verdict block → parse `verdict`, `hard_req_status`, `arc_alignment`, `key_factors`
+- Turn 1: arc snapshot → checkpoint buttons (confirm / correct)
+- Corrections re-run Turn 1 via `runJDMatchTurn1Continue` — only `confirm` triggers Turn 2
+- Turn 2: full assessment → parse `verdict`, `hard_req_status`, `arc_alignment`, `key_factors`
 
 **resume-targeting** (step: `assessed`):
 - Orchestrator first proposes scope (no Claude call)
@@ -176,27 +177,6 @@ Bullet IDs format: `r{i}-b{j}` (e.g. `r0-b0`). Role IDs: `r0`, `r1`, etc.
 
 ---
 
-## What Exists vs. What Needs Building
+## Implementation Status
 
-**Exists:**
-- `app/api/chat/route.ts` — monolithic ~590 line orchestrator (needs refactor)
-- `app/lib/utils/load-jd.ts`, `load-resume.ts`, `update-session.ts`, `export-resume.ts`
-- `app/lib/types.ts`, `anthropic.ts`, `supabase.ts`
-- `app/components/` — basic layout, chat, input, checkpoint buttons
-- `skills/jd-decoder.md`, `skills/jd-match.md`, `skills/resume-targeting.md`
-
-**Needs building (backend):**
-- `app/lib/utils/storage.ts` — extract Storage I/O
-- `app/lib/utils/messages.ts` — extract message history I/O
-- `app/lib/skills/jd-decoder.ts`, `jd-match.ts`, `resume-targeting.ts`
-- `app/lib/orchestrator.ts`
-- Thin down `app/api/chat/route.ts`
-
-**Needs building (frontend):**
-- `app/lib/session.ts` — useSession hook
-- `app/lib/sse.ts` — SSE connection manager (uses fetch + ReadableStream, NOT EventSource)
-- `app/lib/api.ts` — typed wrappers for getActiveSession, postReviews
-- `app/api/session/active/route.ts`, `app/api/session/reviews/route.ts`
-- Components: `cards/JDDecodeCard.tsx`, `cards/FitAssessmentCard.tsx`
-- Components: `diff/DiffViewPanel.tsx` and all sub-components
-- Chat components: `MessageList.tsx`, `ProgressUpdate.tsx`, `ErrorMessage.tsx`
+All four layers are fully implemented — do not create files that already exist. For runtime behavior detail see `docs/system-flow.md`.
