@@ -88,6 +88,27 @@ describe('multiple artifacts', () => {
   })
 })
 
+// ─── raw_jd.md exclusion ─────────────────────────────────────────────────────
+
+describe('raw_jd.md exclusion', () => {
+  it('never loads raw_jd.md even when it exists', async () => {
+    mockFiles({ 'raw_jd.md': 'Raw job description text...' })
+    const result = await resolveSessionContext('u-1', 's-1')
+    expect(result).toBe('')
+    expect(vi.mocked(readFile)).not.toHaveBeenCalledWith(expect.any(String), expect.any(String), 'raw_jd.md')
+  })
+
+  it('loads decoded_jd.md but not raw_jd.md when both exist', async () => {
+    mockFiles({
+      'raw_jd.md':     'Raw JD text',
+      'decoded_jd.md': 'Decoded JD content',
+    })
+    const result = await resolveSessionContext('u-1', 's-1')
+    expect(result).toContain('Decoded JD content')
+    expect(result).not.toContain('Raw JD text')
+  })
+})
+
 // ─── Edge cases ───────────────────────────────────────────────────────────────
 
 describe('edge cases', () => {

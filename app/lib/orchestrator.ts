@@ -6,7 +6,7 @@ import { loadJD } from './utils/load-jd'
 import { loadResume } from './utils/load-resume'
 import { exportResume } from './utils/export-resume'
 import { runJDDecoder } from './skills/jd-decoder'
-import { runJDMatchTurn1, runJDMatchTurn2 } from './skills/jd-match'
+import { runJDMatchTurn1, runJDMatchTurn1Continue, runJDMatchTurn2 } from './skills/jd-match'
 import { runResumeTargetingTurn1, runResumeTargetingTurn2 } from './skills/resume-targeting'
 import { classifyIntent } from './intent-decoder'
 import { handleChat } from './handle-chat'
@@ -45,7 +45,7 @@ export async function runOrchestrator(
   // or intent is unclear, respond conversationally and return without advancing.
 
   const SKIP_CLASSIFICATION = new Set<CurrentStep>([
-    'created', 'targeted', 'exported', 'not_pursuing', 'abandoned',
+    'created', 'jd_loaded', 'targeted', 'exported', 'not_pursuing', 'abandoned',
   ])
 
   let resolvedAction: StepAction | null = null
@@ -70,13 +70,8 @@ export async function runOrchestrator(
     await handleCreated(sessionId, userId, message, emit)
 
   } else if (currentStep === 'jd_loaded') {
-    if (resolvedAction === 'reject') {
-      await updateSession(sessionId, userId, { current_step: 'created' })
-      emit({ type: 'message', role: 'assistant', content: 'OK — paste or upload the job description again.' })
-    } else {
-      emit({ type: 'step_complete', step: 'jd_confirmed' })
-      await handleDecodeJD(sessionId, userId, emit)
-    }
+    // Recovery path — JD was loaded but decode hasn't run yet. Resume automatically.
+    await handleDecodeJD(sessionId, userId, emit)
 
   } else if (currentStep === 'decoded') {
     await handleResumeUpload(sessionId, userId, message, emit)
@@ -117,14 +112,7 @@ async function handleCreated(
   }
 
   await updateSession(sessionId, userId, { current_step: 'jd_loaded' })
-  emit({ type: 'step_complete', step: 'jd_loaded' })
-
-  const preview = jdResult.rawText.slice(0, 200).trim()
-  const sparse = jdResult.sparse ? ' (Note: the text looks sparse — the decode may be limited. You can continue or re-enter.)' : ''
-  const previewMsg = `Got it — here's a preview:\n\n"${preview}..."\n\nDoes this look right?${sparse}`
-
-  await storeMessage(sessionId, 'assistant', previewMsg, 'jd_loaded')
-  emit({ type: 'message', role: 'assistant', content: previewMsg })
+  await handleDecodeJD(sessionId, userId, emit)
 }
 
 async function handleDecodeJD(
@@ -210,13 +198,27 @@ async function handleArcCheckpoint(
     return
   }
 
+  // Correction round — continue Turn 1 so the LLM revises the arc snapshot.
+  // Only 'confirm' (the checkpoint button) should advance to Turn 2.
+  if (!(message.type === 'checkpoint' && message.content === 'confirm')) {
+    const correctionResult = await runJDMatchTurn1Continue(sessionId, userId, emit)
+    if (!correctionResult.success) {
+      if (correctionResult.code === 'MISSING_HISTORY') {
+        console.error('[orchestrator] MISSING_HISTORY in Turn 1 continue, session:', sessionId)
+        emit({ type: 'error', code: 'INTERNAL_ERROR', message: 'Something went wrong. Please try again.' })
+      } else {
+        emit({ type: 'error', code: correctionResult.code, message: correctionResult.message })
+      }
+    }
+    return
+  }
+
   emit({ type: 'message', role: 'assistant', content: 'Assessing fit...', progress: true })
 
-  const turn2Result = await runJDMatchTurn2(sessionId, userId, message.content, emit)
+  const turn2Result = await runJDMatchTurn2(sessionId, userId, 'Confirmed, looks right.', emit)
 
   if (!turn2Result.success) {
     if (turn2Result.code === 'MISSING_HISTORY') {
-      // Shouldn't happen given the check above, but handle gracefully
       console.error('[orchestrator] MISSING_HISTORY in Turn 2 despite arc message check, session:', sessionId)
       emit({ type: 'error', code: 'INTERNAL_ERROR', message: 'Something went wrong. Please try again.' })
       return
@@ -239,7 +241,6 @@ async function handleArcCheckpoint(
     arc_alignment: turn2Result.arc_alignment,
     key_factors: turn2Result.key_factors,
   }})
-  emit({ type: 'message', role: 'assistant', content: 'Want to target your resume for this role, or pass on this one?' })
 }
 
 async function handleAssessed(
@@ -378,7 +379,6 @@ async function handleExport(
 
 async function resolveIntentContext(sessionId: string, step: CurrentStep): Promise<IntentContext | null> {
   switch (step) {
-    case 'jd_loaded':    return 'jd_loaded'
     case 'decoded':      return 'decoded'
     case 'resume_loaded': return 'resume_loaded'
     case 'assessed': {

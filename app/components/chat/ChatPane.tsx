@@ -1,6 +1,6 @@
 'use client'
 
-import { useRef, useEffect } from 'react'
+import { useRef, useEffect, useState } from 'react'
 import MessageList from './MessageList'
 import CheckpointButtons from './CheckpointButtons'
 import InputArea from './InputArea'
@@ -15,9 +15,10 @@ interface ChatPaneProps {
 
 export default function ChatPane({ session }: ChatPaneProps) {
   const { messages, isStreaming, checkpoint, currentStep, showDiffView,
-    bulletReviews, bulletEdits, sendMessage, acceptBullet, rejectBullet,
+    bulletReviews, bulletEdits, sendMessage, clearCheckpoint, acceptBullet, rejectBullet,
     editBullet, pendingRecovery, continueSession, abandonSession } = session
   const bottomRef = useRef<HTMLDivElement>(null)
+  const [arcCorrectionMode, setArcCorrectionMode] = useState(false)
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' })
@@ -37,6 +38,9 @@ export default function ChatPane({ session }: ChatPaneProps) {
         })
       }
       reader.readAsDataURL(file)
+    } else if (arcCorrectionMode) {
+      setArcCorrectionMode(false)
+      sendMessage({ type: 'checkpoint', content })
     } else {
       sendMessage({ type: 'text', content })
     }
@@ -118,8 +122,15 @@ export default function ChatPane({ session }: ChatPaneProps) {
       </div>
 
       {/* Bottom bar: checkpoint buttons or text input */}
-      {checkpoint === 'jd_preview' ? (
-        <CheckpointButtons type="jd_preview" onChoice={(val) => sendMessage({ type: 'checkpoint', content: val })} disabled={isStreaming} />
+      {checkpoint === 'arc_confirmation' ? (
+        <CheckpointButtons
+          type="arc_confirmation"
+          onChoice={(val) => {
+            if (val === 'correct') { clearCheckpoint(); setArcCorrectionMode(true) }
+            else sendMessage({ type: 'checkpoint', content: val })
+          }}
+          disabled={isStreaming}
+        />
       ) : showInput ? (
         <InputArea placeholder={getPlaceholder()} disabled={isStreaming} onSend={handleSend} />
       ) : null}

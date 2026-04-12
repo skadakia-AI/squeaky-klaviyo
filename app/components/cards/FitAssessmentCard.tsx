@@ -17,6 +17,12 @@ interface FitAssessmentCardProps {
 export default function FitAssessmentCard({ data, content, onChoice, disabled }: FitAssessmentCardProps) {
   const style = VERDICT_STYLES[data?.verdict] ?? VERDICT_STYLES['not a fit']
 
+  // Strip the machine-readable verdict block at the top of the LLM output.
+  // The format is "## Verdict\nverdict: ...\n---\n\n# Fit Assessment: ...".
+  // The human narrative starts after the first "---" separator line.
+  const separatorIdx = content.indexOf('\n---\n')
+  const narrative = separatorIdx >= 0 ? content.slice(separatorIdx + 5).trim() : content
+
   return (
     <div
       className="rounded-lg overflow-hidden"
@@ -39,7 +45,7 @@ export default function FitAssessmentCard({ data, content, onChoice, disabled }:
 
       {/* Full assessment */}
       <div className="px-4 py-3">
-        <AssistantMessage content={content} />
+        <AssistantMessage content={narrative} />
       </div>
 
       {/* Pursue / pass CTA */}

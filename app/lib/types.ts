@@ -191,7 +191,6 @@ export interface ChatMessage {
 // ─── Checkpoint ───────────────────────────────────────────────────────────────
 
 export type CheckpointType =
-  | 'jd_preview'
   | 'arc_confirmation'
   | 'scope_selection'
   | 'pursue_or_pass'

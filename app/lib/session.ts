@@ -31,13 +31,20 @@ const initialState: ClientState = {
   error: null,
 }
 
+export function applyDone(state: ClientState): ClientState {
+  return {
+    ...state,
+    isStreaming: false,
+    checkpoint: state.currentStep === 'resume_loaded' && !state.error
+      ? 'arc_confirmation'
+      : state.checkpoint,
+  }
+}
+
 export function applyStepComplete(state: ClientState, step: CurrentStep, data?: unknown): ClientState {
   switch (step) {
     case 'jd_loaded':
-      return { ...state, currentStep: step, checkpoint: 'jd_preview' }
-
-    case 'jd_confirmed':
-      return { ...state, checkpoint: null }
+      return { ...state, currentStep: step }
 
     case 'decoded': {
       // Promote the last streamed assistant message to a jd_decode_card
@@ -189,7 +196,7 @@ export function useSession() {
         break
 
       case 'done':
-        setState(prev => ({ ...prev, isStreaming: false }))
+        setState(prev => applyDone(prev))
         break
     }
   }, [])
@@ -269,6 +276,10 @@ export function useSession() {
     sendMessage({ type: 'text', content: 'export' })
   }, [sendMessage])
 
+  const clearCheckpoint = useCallback(() => {
+    setState(prev => ({ ...prev, checkpoint: null }))
+  }, [])
+
   const startNewSession = useCallback(() => {
     cleanupRef.current?.()
     cleanupRef.current = null
@@ -296,6 +307,7 @@ export function useSession() {
     rejectBullet,
     editBullet,
     downloadResume,
+    clearCheckpoint,
     startNewSession,
   }
 }

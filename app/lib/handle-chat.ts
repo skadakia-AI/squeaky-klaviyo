@@ -8,34 +8,61 @@ type ChatEmit = (event:
   | { type: 'error'; code: string; message: string }
 ) => void
 
-// ─── Pending reminders ────────────────────────────────────────────────────────
-// After responding conversationally, re-surface the pending question so the
-// user knows what the app is still waiting for. Keyed by IntentContext because
-// the assessed step has three distinct sub-states each with a different prompt.
+// ─── Per-context chat configuration ──────────────────────────────────────────
+// Each context defines what Claude can discuss and a soft CTA instruction.
+// The CTA is guidance for Claude — not a hardcoded appended bubble.
 
-const PENDING_REMINDERS: Record<IntentContext, string> = {
-  jd_loaded:               'When you\'re ready — does that job description look right?',
-  decoded:                 'When you\'re ready — upload your resume or paste it here.',
-  resume_loaded:           'When you\'re ready — does that career arc snapshot look accurate?',
-  assessed_pursue_or_pass: 'Whenever you\'d like to continue — do you want to target your resume for this role, or pass on it?',
-  assessed_scope:          'Whenever you\'re ready — does that targeting scope work, or would you like to adjust it?',
-  assessed_numbers:        'Whenever you\'re ready — any numbers or metrics you can share for those bullets would help.',
+type ChatConfig = {
+  scope: string
+  cta: string
+}
+
+const CHAT_CONFIGS: Record<IntentContext, ChatConfig> = {
+  jd_loaded: {
+    scope: `The user is reviewing a short preview of a submitted job description. Answer questions about whether the capture looks complete or accurate. Redirect anything unrelated to this preview. Keep responses concise: 2–4 sentences.`,
+    cta: `If asked what to do next: they can confirm the preview looks right or re-enter the JD.`,
+  },
+
+  decoded: {
+    scope: `The user is exploring a decoded job description before uploading their resume. Answer questions about the role — what it's looking for, what strong candidates look like, the domain and tech, how to read specific signals or requirements. Only redirect for topics genuinely unrelated to this role (salary negotiation tactics, cover letters for other jobs). Keep responses concise: 2–4 sentences or a tight bullet list.`,
+    cta: `Always end your response with a brief, natural push toward the next step: uploading or pasting their resume.`,
+  },
+
+  resume_loaded: {
+    scope: `The user is reviewing an arc snapshot — a summary of how their career background reads relative to this role. Answer questions about what it means, how their background was interpreted, or what arc alignment indicates. Keep responses concise: 2–4 sentences.`,
+    cta: `If asked what to do next: confirm the arc looks right or type a correction.`,
+  },
+
+  assessed_pursue_or_pass: {
+    scope: `The user has just received a fit assessment. Answer questions about what the verdict means, how to interpret arc alignment and hard requirements, or why specific factors were highlighted. Be honest about uncertainty. Keep responses concise: 2–4 sentences.`,
+    cta: `If asked what to do next: choose to target their resume for this role or pass on it.`,
+  },
+
+  assessed_scope: {
+    scope: `The user is reviewing a proposed set of resume roles to rewrite. Answer questions about why roles were selected, what targeting scope means, or tradeoffs of broader vs. narrower scope. Keep responses concise: 2–4 sentences.`,
+    cta: `If asked what to do next: confirm the scope or request changes.`,
+  },
+
+  assessed_numbers: {
+    scope: `The user was asked for numbers or metrics before the rewrite begins. Answer questions about what kinds of numbers help, why quantification matters, or how to estimate when exact figures aren't known. Keep responses concise: 2–4 sentences.`,
+    cta: `If asked what to do next: share whatever numbers they have — estimates are fine.`,
+  },
 }
 
 // ─── System prompt ────────────────────────────────────────────────────────────
 
-const BASE_SYSTEM_PROMPT = `You are an assistant helping someone target their resume for a specific job opening.
+const BASE_ROLE = `You are an assistant helping someone target their resume for a specific job opening.`
 
-Answer questions about the resume targeting process — things like what arc alignment means, why you're asking for certain information, what a verdict label indicates, or how the targeting works. You can also briefly acknowledge how the user is feeling about a role or their candidacy.
+function buildSystemPrompt(context: IntentContext | null, artifactContext: string): string {
+  const contextSection = context
+    ? `\n\n${CHAT_CONFIGS[context].scope}\n\n${CHAT_CONFIGS[context].cta}`
+    : ''
 
-Stay within this scope. If the user asks about something outside resume targeting — cover letters, salary negotiation, interview prep, career advice in general, unrelated topics — acknowledge the question briefly and redirect:
-"That's outside what I help with here. I'm focused on targeting your resume for this role. Let me know when you're ready to continue."
+  const artifactSection = artifactContext.trim()
+    ? `\n\n## Session context\n${artifactContext}`
+    : ''
 
-Keep responses brief: 1–3 sentences. Do not ask follow-up questions.`
-
-function buildSystemPrompt(artifactContext: string): string {
-  if (!artifactContext.trim()) return BASE_SYSTEM_PROMPT
-  return `${BASE_SYSTEM_PROMPT}\n\n## Session context\n${artifactContext}`
+  return `${BASE_ROLE}${contextSection}${artifactSection}`
 }
 
 // ─── Handler ──────────────────────────────────────────────────────────────────
@@ -53,8 +80,8 @@ export async function handleChat(
   try {
     const stream = anthropic.messages.stream({
       model: MODELS.analysis,
-      max_tokens: 256,
-      system: buildSystemPrompt(artifactContext),
+      max_tokens: 512,
+      system: buildSystemPrompt(context, artifactContext),
       messages: [{ role: 'user', content: userMessage }],
     })
 
@@ -71,11 +98,5 @@ export async function handleChat(
 
   if (reply) {
     await storeMessage(sessionId, 'assistant', reply, 'chat')
-  }
-
-  // Re-surface the pending question so the user knows what the app is waiting for
-  if (context) {
-    const reminder = PENDING_REMINDERS[context]
-    emit({ type: 'message', role: 'assistant', content: reminder })
   }
 }

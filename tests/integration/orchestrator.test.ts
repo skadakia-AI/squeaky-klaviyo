@@ -40,6 +40,7 @@ vi.mock('../../app/lib/skills/jd-decoder', () => ({
 
 vi.mock('../../app/lib/skills/jd-match', () => ({
   runJDMatchTurn1: vi.fn(),
+  runJDMatchTurn1Continue: vi.fn(),
   runJDMatchTurn2: vi.fn(),
 }))
 
@@ -70,7 +71,7 @@ import { updateSession } from '../../app/lib/utils/update-session'
 import { fetchMessages } from '../../app/lib/utils/messages'
 import { readFile } from '../../app/lib/utils/storage'
 import { runJDDecoder } from '../../app/lib/skills/jd-decoder'
-import { runJDMatchTurn1, runJDMatchTurn2 } from '../../app/lib/skills/jd-match'
+import { runJDMatchTurn1, runJDMatchTurn1Continue, runJDMatchTurn2 } from '../../app/lib/skills/jd-match'
 import { runResumeTargetingTurn1, runResumeTargetingTurn2 } from '../../app/lib/skills/resume-targeting'
 import { classifyIntent } from '../../app/lib/intent-decoder'
 import { handleChat } from '../../app/lib/handle-chat'
@@ -86,7 +87,7 @@ function makeSession(overrides: Record<string, unknown> = {}): Record<string, un
 }
 
 async function run(
-  message: { type: 'text' | 'file_upload'; content: string; file_name?: string; file_type?: string },
+  message: { type: 'text' | 'file_upload' | 'checkpoint'; content: string; file_name?: string; file_type?: string },
   session: Record<string, unknown>
 ): Promise<OrchestratorEvent[]> {
   const events: OrchestratorEvent[] = []
@@ -152,16 +153,17 @@ describe('created step', () => {
     )
   })
 
-  it('advances session to jd_loaded on success', async () => {
+  it('advances directly to decoded without stopping at jd_loaded', async () => {
     vi.mocked(loadJD).mockResolvedValue({ success: true, rawText: 'Software Engineer...', sparse: false })
     vi.mocked(runJDDecoder).mockResolvedValue({ success: true, decodedText: '# JD Decoded', roleTitle: 'SWE', company: 'Acme', slug: 'acme-swe' })
 
     const events = await run({ type: 'text', content: 'some jd text' }, makeSession())
 
     expect(vi.mocked(updateSession)).toHaveBeenCalledWith(
-      SESSION_ID, USER_ID, expect.objectContaining({ current_step: 'jd_loaded' })
+      SESSION_ID, USER_ID, expect.objectContaining({ current_step: 'decoded' })
     )
-    expect(events.some(e => e.type === 'step_complete' && e.step === 'jd_loaded')).toBe(true)
+    expect(events.some(e => e.type === 'step_complete' && e.step === 'decoded')).toBe(true)
+    expect(events.some(e => e.type === 'step_complete' && e.step === 'jd_loaded')).toBe(false)
   })
 
   it('emits error and does not advance on loadJD failure', async () => {
@@ -176,69 +178,19 @@ describe('created step', () => {
   })
 })
 
-// ─── jd_loaded step ───────────────────────────────────────────────────────────
+// ─── jd_loaded step (recovery) ────────────────────────────────────────────────
 
 describe('jd_loaded step', () => {
-  it('"no" (classified as reject) resets session to created', async () => {
-    vi.mocked(classifyIntent).mockResolvedValue({ action: 'reject', confidence: 'high' })
-
-    const events = await run(
-      { type: 'text', content: 'no' },
-      makeSession({ current_step: 'jd_loaded' })
-    )
-
-    expect(vi.mocked(updateSession)).toHaveBeenCalledWith(
-      SESSION_ID, USER_ID, { current_step: 'created' }
-    )
-    expect(events.some(e => e.type === 'message')).toBe(true)
-    expect(vi.mocked(runJDDecoder)).not.toHaveBeenCalled()
-  })
-
-  it('"n" (classified as reject) resets session to created', async () => {
-    vi.mocked(classifyIntent).mockResolvedValue({ action: 'reject', confidence: 'high' })
-
-    await run({ type: 'text', content: 'n' }, makeSession({ current_step: 'jd_loaded' }))
-    expect(vi.mocked(updateSession)).toHaveBeenCalledWith(SESSION_ID, USER_ID, { current_step: 'created' })
-  })
-
-  it('confirmation emits jd_confirmed then runs decoder', async () => {
+  it('auto-resumes decode on any message (recovery path)', async () => {
     vi.mocked(runJDDecoder).mockResolvedValue({ success: true, decodedText: '# JD Decoded', roleTitle: 'SWE', company: 'Acme', slug: 'acme-swe' })
 
     const events = await run(
-      { type: 'text', content: 'yes' },
+      { type: 'text', content: 'anything' },
       makeSession({ current_step: 'jd_loaded' })
     )
 
-    expect(events.some(e => e.type === 'step_complete' && e.step === 'jd_confirmed')).toBe(true)
     expect(vi.mocked(runJDDecoder)).toHaveBeenCalled()
-  })
-
-  it('advances to decoded on successful decode', async () => {
-    vi.mocked(runJDDecoder).mockResolvedValue({ success: true, decodedText: '# JD Decoded', roleTitle: 'SWE', company: 'Acme', slug: 'acme-swe' })
-
-    const events = await run(
-      { type: 'text', content: 'looks right' },
-      makeSession({ current_step: 'jd_loaded' })
-    )
-
-    expect(vi.mocked(updateSession)).toHaveBeenCalledWith(
-      SESSION_ID, USER_ID, expect.objectContaining({ current_step: 'decoded' })
-    )
     expect(events.some(e => e.type === 'step_complete' && e.step === 'decoded')).toBe(true)
-  })
-
-  it('emits error and does not advance on decoder failure', async () => {
-    vi.mocked(runJDDecoder).mockResolvedValue({ success: false, code: 'API_ERROR', message: 'Failed' })
-
-    const events = await run(
-      { type: 'text', content: 'yes' },
-      makeSession({ current_step: 'jd_loaded' })
-    )
-
-    expect(events.some(e => e.type === 'error')).toBe(true)
-    expect(vi.mocked(updateSession)).not.toHaveBeenCalledWith(
-      expect.anything(), expect.anything(), expect.objectContaining({ current_step: 'decoded' })
-    )
   })
 })
 
@@ -304,27 +256,20 @@ describe('decoded step', () => {
 describe('resume_loaded step', () => {
   const arcMessage = { role: 'assistant' as const, content: 'Here is your arc snapshot...' }
 
-  it('runs Turn 2 when arc message exists', async () => {
+  it('runs Turn 1 continuation (not Turn 2) when message is a correction', async () => {
     vi.mocked(fetchMessages).mockResolvedValue([arcMessage])
-    vi.mocked(runJDMatchTurn2).mockResolvedValue({
-      success: true,
-      assessmentText: 'Full assessment...',
-      verdict: 'no-brainer',
-      hard_req_status: 'all met',
-      arc_alignment: 'strong',
-      key_factors: 'Led infra',
-    })
+    vi.mocked(runJDMatchTurn1Continue).mockResolvedValue({ success: true, arcText: 'Revised arc...' })
 
     await run(
-      { type: 'text', content: 'yes that looks right' },
+      { type: 'text', content: 'actually I also ran ops' },
       makeSession({ current_step: 'resume_loaded' })
     )
 
-    expect(vi.mocked(runJDMatchTurn2)).toHaveBeenCalled()
-    expect(vi.mocked(runJDMatchTurn1)).not.toHaveBeenCalled()
+    expect(vi.mocked(runJDMatchTurn1Continue)).toHaveBeenCalled()
+    expect(vi.mocked(runJDMatchTurn2)).not.toHaveBeenCalled()
   })
 
-  it('advances to assessed with verdict data on success', async () => {
+  it('advances to assessed with verdict data on checkpoint confirm', async () => {
     vi.mocked(fetchMessages).mockResolvedValue([arcMessage])
     vi.mocked(runJDMatchTurn2).mockResolvedValue({
       success: true,
@@ -336,7 +281,7 @@ describe('resume_loaded step', () => {
     })
 
     const events = await run(
-      { type: 'text', content: 'yes' },
+      { type: 'checkpoint', content: 'confirm' },
       makeSession({ current_step: 'resume_loaded' })
     )
 
@@ -360,12 +305,48 @@ describe('resume_loaded step', () => {
     expect(events.some(e => e.type === 'error')).toBe(false)
   })
 
+  it('checkpoint correction bypasses intent classifier and continues Turn 1', async () => {
+    vi.mocked(fetchMessages).mockResolvedValue([arcMessage])
+    vi.mocked(runJDMatchTurn1Continue).mockResolvedValue({ success: true, arcText: 'Revised arc...' })
+
+    await run(
+      { type: 'checkpoint', content: "I haven't scaled yet — still building" },
+      makeSession({ current_step: 'resume_loaded' })
+    )
+
+    expect(vi.mocked(classifyIntent)).not.toHaveBeenCalled()
+    expect(vi.mocked(runJDMatchTurn1Continue)).toHaveBeenCalledWith(SESSION_ID, USER_ID, expect.any(Function))
+    expect(vi.mocked(runJDMatchTurn2)).not.toHaveBeenCalled()
+  })
+
+  it('checkpoint confirm bypasses intent classifier and runs Turn 2', async () => {
+    vi.mocked(fetchMessages).mockResolvedValue([arcMessage])
+    vi.mocked(runJDMatchTurn2).mockResolvedValue({
+      success: true,
+      assessmentText: 'Full assessment...',
+      verdict: 'no-brainer',
+      hard_req_status: 'all met',
+      arc_alignment: 'strong',
+      key_factors: 'Led infra',
+    })
+
+    await run(
+      { type: 'checkpoint', content: 'confirm' },
+      makeSession({ current_step: 'resume_loaded' })
+    )
+
+    expect(vi.mocked(classifyIntent)).not.toHaveBeenCalled()
+    expect(vi.mocked(runJDMatchTurn2)).toHaveBeenCalledWith(
+      SESSION_ID, USER_ID, 'Confirmed, looks right.', expect.any(Function)
+    )
+  })
+
   it('emits error if Turn 2 fails', async () => {
     vi.mocked(fetchMessages).mockResolvedValue([arcMessage])
     vi.mocked(runJDMatchTurn2).mockResolvedValue({ success: false, code: 'API_ERROR', message: 'Failed' })
 
     const events = await run(
-      { type: 'text', content: 'yes' },
+      { type: 'checkpoint', content: 'confirm' },
       makeSession({ current_step: 'resume_loaded' })
     )
 
@@ -373,6 +354,19 @@ describe('resume_loaded step', () => {
     expect(vi.mocked(updateSession)).not.toHaveBeenCalledWith(
       expect.anything(), expect.anything(), expect.objectContaining({ current_step: 'assessed' })
     )
+  })
+
+  it('emits error if Turn 1 continuation fails', async () => {
+    vi.mocked(fetchMessages).mockResolvedValue([arcMessage])
+    vi.mocked(runJDMatchTurn1Continue).mockResolvedValue({ success: false, code: 'API_ERROR', message: 'Failed' })
+
+    const events = await run(
+      { type: 'checkpoint', content: 'My correction here' },
+      makeSession({ current_step: 'resume_loaded' })
+    )
+
+    expect(events.some(e => e.type === 'error')).toBe(true)
+    expect(vi.mocked(runJDMatchTurn2)).not.toHaveBeenCalled()
   })
 })
 
@@ -542,11 +536,11 @@ describe('chat bypass', () => {
 
     const events = await run(
       { type: 'text', content: 'what does arc alignment mean?' },
-      makeSession({ current_step: 'jd_loaded' })
+      makeSession({ current_step: 'decoded' })
     )
 
     expect(vi.mocked(handleChat)).toHaveBeenCalled()
-    expect(vi.mocked(runJDDecoder)).not.toHaveBeenCalled()
+    expect(vi.mocked(loadResume)).not.toHaveBeenCalled()
     expect(vi.mocked(updateSession)).not.toHaveBeenCalled()
     expect(events.some(e => e.type === 'step_complete')).toBe(false)
   })
@@ -569,14 +563,14 @@ describe('chat bypass', () => {
 
     await run(
       { type: 'text', content: 'tell me more about this role' },
-      makeSession({ current_step: 'jd_loaded' })
+      makeSession({ current_step: 'decoded' })
     )
 
     expect(vi.mocked(resolveSessionContext)).toHaveBeenCalledWith(USER_ID, SESSION_ID)
     expect(vi.mocked(handleChat)).toHaveBeenCalledWith(
       SESSION_ID, USER_ID,
       'tell me more about this role',
-      'jd_loaded',
+      'decoded',
       '## Decoded Job Description\nLead PM role...',
       expect.any(Function)
     )

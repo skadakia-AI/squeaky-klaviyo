@@ -121,13 +121,11 @@ If any step fails, it returns `{ success: false, error: '...', message: '...' }`
 
 Back in `handleCreated()`:
 - Checks the result. If failed, emits `{ type: 'error', ... }` and returns. Session does not advance.
-- If succeeded: calls `updateSession()` to write `current_step: 'jd_loaded'` to Postgres
-- Emits `{ type: 'step_complete', step: 'jd_loaded' }`
-- Builds a preview message with the first 200 characters of the JD text
-- Stores the preview message in the messages table via `storeMessage()`
-- Emits `{ type: 'message', content: '"Got it — here\'s a preview..."' }`
+- If succeeded: calls `updateSession()` to write `current_step: 'jd_loaded'` to Postgres, then immediately calls `handleDecodeJD()` — no confirmation step, no pause for user input.
 
-Then returns. The orchestrator is done. The route's `finally` block emits `{ type: 'done' }` and closes the stream.
+`handleDecodeJD()` emits a progress message, calls `runJDDecoder()`, and on success writes `current_step: 'decoded'` and emits `step_complete: decoded`. The stream then closes.
+
+There is no separate `jd_loaded` interaction phase. The JD is loaded and decoded in a single shot.
 
 ### 7. `sse.ts` receives events in the browser
 
@@ -152,8 +150,8 @@ A single server response may produce many events. They arrive in order over the 
 
 React re-renders after each `setState` call. The user sees:
 1. The progress bubble ("Fetching job description...") appears
-2. The preview message appears
-3. The "Looks right / Re-enter" checkpoint buttons appear (triggered by `step_complete: jd_loaded`)
+2. The progress bubble ("Decoding job description...") appears
+3. The decoded JD card renders (triggered by `step_complete: decoded`, which promotes the streamed text bubble to a `JDDecodeCard`)
 
 ---
 
@@ -230,11 +228,14 @@ The `jd-match` and `resume-targeting` skills each involve two Claude turns. The 
 
 Turn 1 runs when the resume is first uploaded. The skill calls Claude with the decoded JD + structured resume as context. Claude responds with an arc snapshot and a confirmation question. Both the user prompt and the Claude response are written to the messages table under `step: 'resume_loaded'`.
 
-When the user responds to the confirmation, Turn 2 runs. The skill fetches all messages for `step: 'resume_loaded'` from the database, appends the user's new response, and sends the full conversation to Claude. Claude has full context of what it said in Turn 1 and what the user confirmed or corrected.
+When the user responds to the arc snapshot, two paths are possible:
+
+- **Confirm** (`checkpoint` button, `content: 'confirm'`): Turn 2 runs. The skill fetches all messages for `step: 'resume_loaded'`, appends 'Confirmed, looks right.', and sends the full conversation to Claude for the full fit assessment.
+- **Correct** (any other message, including `checkpoint` corrections): `runJDMatchTurn1Continue` runs. It loads the conversation history — which already includes the user's stored correction — and re-runs the LLM with the Turn 1 system prompt. The LLM revises the arc snapshot and asks again. Turn 2 does not run until the user explicitly confirms.
 
 This is what makes multi-turn coherent across the stateless HTTP boundary. Each request to the server is independent — the server has no in-memory session state. The messages table is the conversation memory.
 
-Turn detection in the orchestrator works by counting stored messages: zero assistant messages for the current step means Turn 1 hasn't run yet. If Turn 2 is somehow requested with no stored history (interrupted session, data loss), the orchestrator detects this and silently restarts Turn 1 rather than attempting Turn 2 on empty context.
+Turn detection in the orchestrator works by counting stored messages: zero assistant messages for the current step means Turn 1 hasn't run yet. If a confirm arrives with no stored history (interrupted session, data loss), the orchestrator detects this and silently restarts Turn 1 rather than attempting Turn 2 on empty context.
 
 ---
 
@@ -292,7 +293,6 @@ When a user clicks a checkpoint button (e.g., "This is the right JD — continue
 
 | Step | Context | Valid actions |
 |---|---|---|
-| `jd_loaded` | `'jd_loaded'` | confirm, reject, chat, unclear |
 | `decoded` | `'decoded'` | resume_submit, chat, unclear |
 | `resume_loaded` | `'resume_loaded'` | confirm, chat, unclear |
 | `assessed` (pursue/pass) | `'assessed_pursue_or_pass'` | confirm, pass, chat, unclear |
@@ -301,15 +301,15 @@ When a user clicks a checkpoint button (e.g., "This is the right JD — continue
 
 **Which steps skip classification:**
 
-`created`, `targeted`, `exported`, `not_pursuing`, `abandoned`. Terminal states or steps with unambiguous input. File uploads always skip classification regardless of step.
+`created`, `jd_loaded`, `targeted`, `exported`, `not_pursuing`, `abandoned`. Terminal states, auto-advancing steps, or steps with unambiguous input. File uploads always skip classification regardless of step.
 
 **`handleChat` and session context:**
 
-When the orchestrator routes to `handleChat`, it first calls `resolveSessionContext(userId, sessionId)` from `app/lib/utils/session-context.ts`. This reads every artifact that exists so far for the session — `raw_jd.md`, `decoded_jd.md`, `resume_main.md`, `fit_assessment.md` — and returns them as a formatted string. Missing files are silently skipped.
+When the orchestrator routes to `handleChat`, it first calls `resolveSessionContext(userId, sessionId)` from `app/lib/utils/session-context.ts`. This reads every artifact that exists so far for the session — `decoded_jd.md`, `resume_main.md`, `fit_assessment.md` — and returns them as a formatted string. Missing files are silently skipped. `raw_jd.md` is intentionally excluded: the decoded version supersedes it once available, and before decode it is too large and unstructured to be useful in a chat context.
 
 That string is passed into `handleChat` as `artifactContext` and injected into the Claude system prompt, so answers are grounded in actual session content rather than generic knowledge. At the `decoded` step, only the decoded JD exists, so Claude can answer questions about what was just decoded. At `assessed`, Claude has the JD, resume, and fit assessment — the full picture.
 
-After streaming the response, `handleChat` stores the message under `step: 'chat'` (isolated from skill conversation history) and emits a pending reminder keyed by the current `IntentContext`.
+`handleChat` uses a per-context system prompt (`CHAT_CONFIGS`) that scopes the response to what is relevant at each step — preventing Claude from jumping ahead or behind in the workflow. After streaming the response, it stores the message under `step: 'chat'` (isolated from skill conversation history).
 
 **Why this design:**
 
@@ -319,21 +319,21 @@ Before this gate, the orchestrator used regex and string matching to distinguish
 
 ## The State Machine
 
-The orchestrator routes based on `current_step` read from the Supabase sessions table at the start of each request. Steps advance only on success. They never go backward except for the explicit `jd_loaded → created` reset when the user rejects the JD preview.
+The orchestrator routes based on `current_step` read from the Supabase sessions table at the start of each request. Steps advance only on success.
 
 ```
 created
-  └─► (JD submitted) → jd_loaded
-        └─► (user confirms) →  [jd_confirmed — SSE only, not persisted]
-              └─► decoded
-                    └─► (resume uploaded) → resume_loaded
-                          └─► (user responds to arc) → assessed
-                                ├─► (user passes) → not_pursuing  [terminal]
-                                └─► (user pursues) → targeted
-                                      └─► (user downloads) → exported  [terminal]
+  └─► (JD submitted) → jd_loaded → decoded  [automatic, no user confirmation]
+                                      └─► (resume uploaded) → resume_loaded
+                                            └─► (user confirms arc) → assessed
+                                                  ├─► (user passes) → not_pursuing  [terminal]
+                                                  └─► (user pursues) → targeted
+                                                        └─► (user downloads) → exported  [terminal]
 ```
 
-`jd_confirmed` is a special case: it exists as a `CurrentStep` type value and is emitted as an SSE event, but it is never written to the database. The database goes directly from `jd_loaded` to `decoded`. The SSE event is needed only to tell the browser to hide the checkpoint buttons before the decoder starts streaming.
+`jd_loaded` is a transient state — the orchestrator advances through it immediately to `decoded` without waiting for user input. It exists in the DB as a recovery checkpoint: if a session is interrupted between JD load and decode, the next request resumes the decode automatically.
+
+The `resume_loaded` step involves an arc snapshot confirmation loop. The user may make corrections (returning to Turn 1) any number of times before confirming. Only the "Looks right — assess fit" checkpoint button triggers Turn 2 and advances to `assessed`.
 
 The `assessed` step has internal sub-states that are not tracked in the database — they're inferred from message history. The orchestrator detects which sub-state it's in by counting stored messages for the `assessed` step.
 

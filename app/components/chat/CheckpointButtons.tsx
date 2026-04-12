@@ -1,13 +1,13 @@
 interface CheckpointButtonsProps {
-  type: 'jd_preview' | 'pursue_or_pass'
+  type: 'arc_confirmation' | 'pursue_or_pass'
   onChoice: (value: string) => void
   disabled: boolean
 }
 
 const BUTTONS = {
-  jd_preview: [
-    { label: 'This is the right JD — continue', value: 'confirm', primary: true },
-    { label: 'Re-enter', value: 'reject', primary: false },
+  arc_confirmation: [
+    { label: 'Looks right — assess fit', value: 'confirm', primary: true },
+    { label: 'Make a correction', value: 'correct', primary: false },
   ],
   pursue_or_pass: [
     { label: 'Target my resume', value: 'confirm', primary: true },

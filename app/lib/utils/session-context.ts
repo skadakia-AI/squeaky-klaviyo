@@ -2,11 +2,12 @@ import { readFile } from './storage'
 
 // Artifacts in the order they are created during the workflow.
 // Each has a label used as a section header in the context string.
+// raw_jd.md is intentionally excluded — decoded_jd.md supersedes it once available,
+// and at jd_loaded (before decode) the raw JD is too large and unstructured to be useful.
 const ARTIFACTS: { filename: string; label: string }[] = [
-  { filename: 'raw_jd.md',         label: 'Job Description (raw)'     },
-  { filename: 'decoded_jd.md',     label: 'Decoded Job Description'   },
-  { filename: 'resume_main.md',    label: 'Resume'                    },
-  { filename: 'fit_assessment.md', label: 'Fit Assessment'            },
+  { filename: 'decoded_jd.md',     label: 'Decoded Job Description' },
+  { filename: 'resume_main.md',    label: 'Resume'                  },
+  { filename: 'fit_assessment.md', label: 'Fit Assessment'          },
 ]
 
 // Loads whatever session artifacts exist so far and returns them as a

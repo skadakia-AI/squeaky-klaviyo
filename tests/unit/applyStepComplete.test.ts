@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { applyStepComplete } from '../../app/lib/session'
+import { applyStepComplete, applyDone } from '../../app/lib/session'
 import type { ClientState, ChatMessage, CurrentStep } from '../../app/lib/types'
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -36,33 +36,11 @@ function buildMessage(overrides: Partial<ChatMessage> = {}): ChatMessage {
 // ─── jd_loaded ────────────────────────────────────────────────────────────────
 
 describe('jd_loaded', () => {
-  it('sets currentStep and checkpoint', () => {
+  it('sets currentStep without setting a checkpoint', () => {
     const state = buildState()
     const next = applyStepComplete(state, 'jd_loaded')
     expect(next.currentStep).toBe('jd_loaded')
-    expect(next.checkpoint).toBe('jd_preview')
-  })
-
-  it('does not mutate the original state', () => {
-    const state = buildState({ checkpoint: null })
-    applyStepComplete(state, 'jd_loaded')
-    expect(state.checkpoint).toBeNull()
-  })
-})
-
-// ─── jd_confirmed ─────────────────────────────────────────────────────────────
-
-describe('jd_confirmed', () => {
-  it('clears the checkpoint', () => {
-    const state = buildState({ checkpoint: 'jd_preview' })
-    const next = applyStepComplete(state, 'jd_confirmed')
     expect(next.checkpoint).toBeNull()
-  })
-
-  it('does not change currentStep', () => {
-    const state = buildState({ currentStep: 'jd_loaded' })
-    const next = applyStepComplete(state, 'jd_confirmed')
-    expect(next.currentStep).toBe('jd_loaded')
   })
 })
 
@@ -243,6 +221,41 @@ describe('exported', () => {
     const next = applyStepComplete(state, 'exported')
     expect(next.currentStep).toBe('exported')
     expect(next.showDiffView).toBe(false)
+  })
+})
+
+// ─── applyDone ────────────────────────────────────────────────────────────────
+
+describe('applyDone', () => {
+  it('sets isStreaming to false', () => {
+    const state = buildState({ isStreaming: true })
+    const next = applyDone(state)
+    expect(next.isStreaming).toBe(false)
+  })
+
+  it('sets arc_confirmation checkpoint when currentStep is resume_loaded and no error', () => {
+    const state = buildState({ currentStep: 'resume_loaded', isStreaming: true, error: null })
+    const next = applyDone(state)
+    expect(next.checkpoint).toBe('arc_confirmation')
+  })
+
+  it('does not set arc_confirmation when currentStep is resume_loaded but there is an error', () => {
+    const state = buildState({ currentStep: 'resume_loaded', isStreaming: true, error: { code: 'API_ERROR', message: 'Failed' } })
+    const next = applyDone(state)
+    expect(next.checkpoint).toBeNull()
+  })
+
+  it('preserves existing checkpoint when currentStep is not resume_loaded', () => {
+    const state = buildState({ currentStep: 'assessed', checkpoint: 'pursue_or_pass', isStreaming: true })
+    const next = applyDone(state)
+    expect(next.checkpoint).toBe('pursue_or_pass')
+  })
+
+  it('does not mutate the original state', () => {
+    const state = buildState({ currentStep: 'resume_loaded', isStreaming: true })
+    applyDone(state)
+    expect(state.isStreaming).toBe(true)
+    expect(state.checkpoint).toBeNull()
   })
 })
 

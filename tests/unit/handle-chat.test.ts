@@ -85,60 +85,50 @@ describe('message storage', () => {
   })
 })
 
-// ─── Reminder behavior ────────────────────────────────────────────────────────
+// ─── No reminder bubble ───────────────────────────────────────────────────────
 
-describe('pending reminder', () => {
-  it('appends a reminder message when context is provided', async () => {
-    mockStream('Good question.')
-    const events: EmittedEvent[] = []
-    await handleChat('s-1', 'u-1', 'what does sparse mean?', 'jd_loaded', '', (e) => events.push(e as EmittedEvent))
-
-    const messages = events.filter(e => e.type === 'message') as { type: 'message'; content: string }[]
-    expect(messages).toHaveLength(1)
-    expect(messages[0].content).toContain('job description')
-  })
-
-  it('appends the correct reminder for each context', async () => {
-    const contexts: Array<{ context: Parameters<typeof handleChat>[3]; keyword: string }> = [
-      { context: 'jd_loaded',               keyword: 'job description' },
-      { context: 'decoded',                  keyword: 'resume'          },
-      { context: 'resume_loaded',            keyword: 'arc snapshot'    },
-      { context: 'assessed_pursue_or_pass',  keyword: 'target'          },
-      { context: 'assessed_scope',           keyword: 'scope'           },
-      { context: 'assessed_numbers',         keyword: 'numbers'         },
+describe('no reminder bubble', () => {
+  it('does not emit a message event after streaming, regardless of context', async () => {
+    const contexts: Parameters<typeof handleChat>[3][] = [
+      'jd_loaded', 'decoded', 'resume_loaded',
+      'assessed_pursue_or_pass', 'assessed_scope', 'assessed_numbers', null,
     ]
-
-    for (const { context, keyword } of contexts) {
+    for (const context of contexts) {
       vi.clearAllMocks()
       mockStream('Response.')
       const events: EmittedEvent[] = []
       await handleChat('s-1', 'u-1', 'question', context, '', (e) => events.push(e as EmittedEvent))
-
-      const messages = events.filter(e => e.type === 'message') as { type: 'message'; content: string }[]
-      expect(messages).toHaveLength(1)
-      expect(messages[0].content.toLowerCase()).toContain(keyword)
+      expect(events.filter(e => e.type === 'message')).toHaveLength(0)
     }
   })
+})
 
-  it('does not append a reminder when context is null', async () => {
+// ─── Per-context system prompt ────────────────────────────────────────────────
+
+describe('per-context system prompt', () => {
+  it('decoded context includes broad role-discussion scope', async () => {
     mockStream('Response.')
-    const events: EmittedEvent[] = []
-    await handleChat('s-1', 'u-1', 'question', null, '', (e) => events.push(e as EmittedEvent))
+    await handleChat('s-1', 'u-1', 'what does this role want?', 'decoded', '', () => {})
 
-    const messages = events.filter(e => e.type === 'message')
-    expect(messages).toHaveLength(0)
+    const call = vi.mocked(anthropic.messages.stream).mock.calls[0][0]
+    expect(call.system).toContain('strong candidates')
+    expect(call.system).toContain('resume')
   })
 
-  it('reminder comes after the streamed tokens, not before', async () => {
-    mockStream('The answer is...')
-    const events: EmittedEvent[] = []
-    await handleChat('s-1', 'u-1', 'explain arc alignment', 'resume_loaded', '', (e) => events.push(e as EmittedEvent))
+  it('resume_loaded context scopes to arc snapshot discussion', async () => {
+    mockStream('Response.')
+    await handleChat('s-1', 'u-1', 'what does arc mean?', 'resume_loaded', '', () => {})
 
-    const lastToken = [...events].reverse().find(e => e.type === 'token')
-    const reminder = events.find(e => e.type === 'message')
-    const lastTokenIdx = events.lastIndexOf(lastToken!)
-    const reminderIdx = events.indexOf(reminder!)
-    expect(reminderIdx).toBeGreaterThan(lastTokenIdx)
+    const call = vi.mocked(anthropic.messages.stream).mock.calls[0][0]
+    expect(call.system).toContain('arc snapshot')
+  })
+
+  it('null context still produces a valid system prompt', async () => {
+    mockStream('Response.')
+    await handleChat('s-1', 'u-1', 'question', null, '', () => {})
+
+    const call = vi.mocked(anthropic.messages.stream).mock.calls[0][0]
+    expect(call.system).toBeTruthy()
   })
 })
 

@@ -82,6 +82,54 @@ TURN 1 INSTRUCTION: Execute Steps 1 and 2 ONLY.
   return { success: true, arcText }
 }
 
+// Continues Turn 1 after the user submitted a correction.
+// The user's correction is already stored in the DB (by runOrchestrator).
+// Loads the full conversation history, re-runs the LLM with the same
+// Turn 1 system prompt, and stores the revised arc response.
+export async function runJDMatchTurn1Continue(
+  sessionId: string,
+  userId: string,
+  emit: SkillEmit
+): Promise<JDMatchTurn1Result> {
+  const history = await fetchMessages(sessionId, 'resume_loaded')
+  if (history.length === 0) {
+    return { success: false, code: 'MISSING_HISTORY', message: 'MISSING_HISTORY' }
+  }
+
+  const skillText = fs.readFileSync(path.join(process.cwd(), 'skills', 'jd-match.md'), 'utf-8')
+  const system = `${skillText}
+
+---
+TURN 1 INSTRUCTION: Execute Steps 1 and 2 ONLY.
+- Extract Sections 10 and 11 from the decoded JD (internal, do not print)
+- Print the resume arc snapshot (3–5 bullets)
+- Ask the confirmation question
+- STOP. Do not proceed to Steps 3–6. Do not run the hard requirements check or verdict.`
+
+  let arcText = ''
+  try {
+    const stream = anthropic.messages.stream({
+      model: MODELS.analysis,
+      max_tokens: 1024,
+      system,
+      messages: history,
+    })
+    for await (const chunk of stream) {
+      if (chunk.type === 'content_block_delta' && chunk.delta.type === 'text_delta') {
+        emit({ type: 'token', content: chunk.delta.text })
+        arcText += chunk.delta.text
+      }
+    }
+  } catch (err: unknown) {
+    const status = (err as { status?: number }).status
+    if (status === 429) return { success: false, code: 'RATE_LIMITED', message: 'The AI service is busy — wait a moment and try again.' }
+    return { success: false, code: 'API_ERROR', message: 'The arc revision failed. Please try again.' }
+  }
+
+  await storeMessage(sessionId, 'assistant', arcText, 'resume_loaded')
+  return { success: true, arcText }
+}
+
 export async function runJDMatchTurn2(
   sessionId: string,
   userId: string,
