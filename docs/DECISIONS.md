@@ -55,6 +55,15 @@ A running log of significant design decisions — what was decided, what alterna
 
 ---
 
+## Intent Classification
+
+### assessed_numbers sub-state bypasses the classifier
+**Decision:** When the orchestrator is waiting for numbers (Turn 1 asked for metrics, user hasn't responded yet), `resolveIntentContext` returns `null` instead of `'assessed_numbers'`, bypassing the intent classifier entirely. Any user message in this sub-state triggers Turn 2 directly.
+**Alternatives considered:** Classify as `numbers_response` / `chat` / `unclear` using the normal classifier path.
+**Rationale:** "Skip" is the canonical example of why this is hard. In `assessed_pursue_or_pass` context, "skip" correctly means "pass on this role." In numbers context, "skip" means "proceed without metrics." A classifier given `assessed_numbers` context and the message "skip" can produce either reading depending on how the description is worded — and even a well-worded description is fragile. Since there is no meaningful action to take in this sub-state other than proceeding to Turn 2 (there is no "wait longer" or "abort" path), bypassing the classifier is strictly correct. The only exception would be a genuine question ("why do you need these?"), which gets handled after the fact when the user sees the rewrite output.
+
+---
+
 ## Orchestrator & State Machine
 
 ### Single API endpoint with state machine routing

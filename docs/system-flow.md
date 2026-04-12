@@ -297,7 +297,9 @@ When a user clicks a checkpoint button (e.g., "This is the right JD — continue
 | `resume_loaded` | `'resume_loaded'` | confirm, chat, unclear |
 | `assessed` (pursue/pass) | `'assessed_pursue_or_pass'` | confirm, pass, chat, unclear |
 | `assessed` (scope) | `'assessed_scope'` | scope_confirm, scope_add, chat, unclear |
-| `assessed` (numbers) | `'assessed_numbers'` | numbers_response, chat, unclear |
+| `assessed` (numbers) | bypassed — returns `null` | any message triggers Turn 2 directly |
+
+The numbers sub-state bypasses the classifier entirely. Classifying "skip", "none", "proceed" is too ambiguous (e.g., "skip" in `assessed_pursue_or_pass` means pass on the role; in numbers context it means proceed without metrics). Since any user response in this sub-state should trigger Turn 2, the orchestrator skips classification and routes directly.
 
 **Which steps skip classification:**
 
