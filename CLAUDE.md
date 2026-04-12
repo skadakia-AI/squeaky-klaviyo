@@ -16,7 +16,7 @@ Any change to `app/lib/orchestrator.ts`, `app/lib/session.ts`, `app/lib/sse.ts`,
 - Bug fix → test that would have caught the bug before the fix
 - Intentional behavior change → update the existing test to reflect the new expected behavior
 
-Do not mark a coding task complete without verifying the test suite covers the new behavior. Run `npm run test` before finishing.
+Do not mark a coding task complete without verifying the test suite covers the new behavior. Run `npm run test` before finishing — this runs `tsc --noEmit`, `eslint`, and `vitest` in sequence. All three must pass.
 
 # Squeaky — Project Guide for Claude
 
@@ -142,6 +142,7 @@ MODELS.parsing  = 'claude-haiku-4-5-20251001'  // load-resume structured extract
 - Supabase service role key is server-side only — never in client code or env vars prefixed `NEXT_PUBLIC_`
 - File paths for storage are constructed server-side from `user_id` + `session_id` only — never from client input
 - SSRF protection required on any URL fetch: reject private IPs, `localhost`, non-http(s) schemes
+- Use `app/lib/utils/db.ts` helpers for all session queries in API routes — never call `supabase.from('sessions')` directly
 
 ---
 

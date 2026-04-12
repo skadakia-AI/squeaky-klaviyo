@@ -1,5 +1,6 @@
 import { auth } from '@clerk/nextjs/server'
 import { getServiceClient } from '../../lib/supabase'
+import { createSession, getSession } from '../../lib/utils/db'
 import { runOrchestrator } from '../../lib/orchestrator'
 import type { OrchestratorEvent } from '../../lib/orchestrator'
 
@@ -53,13 +54,9 @@ export async function POST(request: Request) {
     let session: Record<string, unknown>
 
     if (!sessionId) {
-      const { data: newSession, error } = await supabase
-        .from('sessions')
-        .insert({ user_id: userId, current_step: 'created', status: 'in_progress' })
-        .select('id')
-        .single()
+      const newSession = await createSession(supabase, userId)
 
-      if (error || !newSession) {
+      if (!newSession) {
         emit({ type: 'error', code: 'SESSION_ERROR', message: 'Could not start a new session. Please try again.' })
         return
       }
@@ -68,14 +65,9 @@ export async function POST(request: Request) {
       emit({ type: 'session_created', session_id: sessionId! })
       session = { current_step: 'created', user_id: userId }
     } else {
-      const { data: existing, error } = await supabase
-        .from('sessions')
-        .select('*')
-        .eq('id', sessionId)
-        .eq('user_id', userId)
-        .single()
+      const existing = await getSession(supabase, sessionId, userId)
 
-      if (error || !existing) {
+      if (!existing) {
         emit({ type: 'error', code: 'SESSION_NOT_FOUND', message: 'Session not found. Try starting a new session.' })
         return
       }

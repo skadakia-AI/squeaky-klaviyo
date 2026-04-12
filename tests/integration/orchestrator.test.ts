@@ -557,7 +557,7 @@ describe('assessed step', () => {
 
 describe('targeted step', () => {
   it('calls exportResume and advances to exported', async () => {
-    vi.mocked(exportResume).mockResolvedValue({ success: true, downloadUrl: 'https://storage.example.com/export.docx' })
+    vi.mocked(exportResume).mockResolvedValue({ success: true, downloadUrl: 'https://storage.example.com/export.docx', storagePath: 'users/user-1/session-1/export.docx' })
 
     const events = await run(
       { type: 'text', content: 'download' },

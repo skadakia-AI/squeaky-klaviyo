@@ -88,7 +88,7 @@ describe('decoded', () => {
   })
 
   it('sets currentStep to decoded and clears checkpoint', () => {
-    const state = buildState({ checkpoint: 'jd_preview' })
+    const state = buildState({ checkpoint: 'arc_confirmation' })
     const next = applyStepComplete(state, 'decoded')
     expect(next.currentStep).toBe('decoded')
     expect(next.checkpoint).toBeNull()
@@ -296,10 +296,10 @@ describe('applyDone', () => {
 
 describe('default (unknown step)', () => {
   it('sets currentStep without other changes', () => {
-    const state = buildState({ showDiffView: true, checkpoint: 'jd_preview' })
+    const state = buildState({ showDiffView: true, checkpoint: 'arc_confirmation' })
     const next = applyStepComplete(state, 'abandoned' as CurrentStep)
     expect(next.currentStep).toBe('abandoned')
     expect(next.showDiffView).toBe(true)
-    expect(next.checkpoint).toBe('jd_preview')
+    expect(next.checkpoint).toBe('arc_confirmation')
   })
 })

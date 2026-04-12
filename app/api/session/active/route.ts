@@ -1,5 +1,6 @@
 import { auth } from '@clerk/nextjs/server'
 import { getServiceClient } from '../../../lib/supabase'
+import { getActiveSession, patchSession } from '../../../lib/utils/db'
 
 export async function GET() {
   const { userId } = await auth()
@@ -8,24 +9,13 @@ export async function GET() {
   const supabase = getServiceClient()
   const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString()
 
-  // Find most recent in-progress session
-  const { data: session } = await supabase
-    .from('sessions')
-    .select('id, role, company, current_step, created_at, updated_at')
-    .eq('user_id', userId)
-    .eq('status', 'in_progress')
-    .order('updated_at', { ascending: false })
-    .limit(1)
-    .single()
+  const session = await getActiveSession(supabase, userId)
 
   if (!session) return Response.json({ session: null })
 
   // Auto-abandon sessions older than 7 days
   if (session.updated_at < sevenDaysAgo) {
-    await supabase
-      .from('sessions')
-      .update({ status: 'abandoned', updated_at: new Date().toISOString() })
-      .eq('id', session.id)
+    await patchSession(supabase, session.id, userId, { status: 'abandoned', updated_at: new Date().toISOString() })
     return Response.json({ session: null })
   }
 

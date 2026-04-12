@@ -1,5 +1,6 @@
 import { auth } from '@clerk/nextjs/server'
 import { getServiceClient } from '../../../lib/supabase'
+import { getSession, patchSession } from '../../../lib/utils/db'
 
 export async function POST(request: Request) {
   const { userId } = await auth()
@@ -12,29 +13,17 @@ export async function POST(request: Request) {
 
   const supabase = getServiceClient()
 
-  // Verify ownership
-  const { data: session } = await supabase
-    .from('sessions')
-    .select('user_id')
-    .eq('id', session_id)
-    .single()
+  const session = await getSession(supabase, session_id, userId)
+  if (!session) return Response.json({ error: 'Unauthorized' }, { status: 403 })
 
-  if (!session || session.user_id !== userId) {
-    return Response.json({ error: 'Unauthorized' }, { status: 403 })
-  }
+  const ok = await patchSession(supabase, session_id, userId, {
+    bullet_reviews: bullet_reviews ?? {},
+    bullet_edits: bullet_edits ?? {},
+    bullets_accepted: bullets_accepted ?? 0,
+    updated_at: new Date().toISOString(),
+  })
 
-  const { error } = await supabase
-    .from('sessions')
-    .update({
-      bullet_reviews: bullet_reviews ?? {},
-      bullet_edits: bullet_edits ?? {},
-      bullets_accepted: bullets_accepted ?? 0,
-      updated_at: new Date().toISOString(),
-    })
-    .eq('id', session_id)
-
-  if (error) {
-    console.error('[reviews] update error:', error.message)
+  if (!ok) {
     return Response.json({ error: 'Failed to save reviews' }, { status: 500 })
   }
 
