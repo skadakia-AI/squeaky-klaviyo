@@ -5,9 +5,11 @@
 ### UX Polish
 - [ ] **Fit assessment verdict display** — verdict banner looks machine-esque; needs visual cleanup (easy, UI-only)
 - [ ] **Workspace design** — define what the user's workspace should look and feel like: navigation, save/revisit JD decode and fit assessment, overall information architecture. *Scope this before building.*
-- [ ] **User activation & landing page** — empty states, onboarding copy, first-use guidance, easier navigation between sessions/opportunities
+- [ ] **App landing page & onboarding** — app entry point for new users: value prop, sign-in/up, empty state, first-use guidance. Distinct from the marketing landing page.
+- [ ] **User onboarding flow** — guide new users through first session: what to paste, what to expect at each step, why it matters.
 - [ ] **Dashboard / pipeline view** — per-opportunity cards: company, title, fit verdict, step progress, download resume. Backend state and data already exist; display layer is the work. *Simpler than it looks.*
 - [ ] **Resume reuse across sessions** — if user has a prior resume, confirm which to use instead of always asking for a fresh upload. *Scoping is the hard part: per-user storage? most-recent session? explicit resume library?*
+- [ ] **Stripe integration** — paywall for usage beyond a free tier. Decide on model (per-session, subscription, seat) before building.
 
 ### Skill Improvements
 - [ ] **Non-bullet resume sections** — rewrite should also handle skills, summary, projects sections. Requires schema changes (types.ts), skill prompt additions, diff view extensions. *Schema design is the gating work.*
@@ -15,8 +17,11 @@
 - [ ] **JD Decoder section enforcement** — hard limit on section output counts not being respected; needs per-section enforcement
 - [ ] **Progressive JD disclosure** — surface the right decoded intel at the right step (business context + no-brainer hire upfront; requirements for fit; targeting signals for rewrite) rather than dumping everything at once
 
-### Evals
-- [ ] **AI evals for all skill agents** — structured criteria per skill output (jd-decoder, jd-match, resume-targeting), benchmark inputs, pass/fail scoring, regression tracking across prompt changes. Not "test until it feels right."
+### Observability & Evals
+- [ ] **Sentry** — error monitoring for unhandled exceptions in route + orchestrator. Next.js first-class integration, wizard auto-configures most of it. Easy.
+- [ ] **AI observability (Langfuse)** — trace every Claude call: latency, token cost, inputs/outputs per skill. Langfuse preferred over Helicone because it handles both tracing and evals in one tool, directly supporting the evals items below. Medium effort, high value.
+- [ ] **Product telemetry** — user behavior: step completion rates, drop-off points, session counts. Supabase events table already captures some events (decode_completed, verdict_delivered, resume_targeted) — extend and surface. Consider PostHog if a full analytics UI is wanted. Easy.
+- [ ] **AI evals for all skill agents** — structured criteria per skill output (jd-decoder, jd-match, resume-targeting), benchmark inputs, pass/fail scoring, regression tracking across prompt changes. Langfuse (above) is the recommended platform. Not "test until it feels right."
 - [ ] **Eval: orchestrator on bad input** — non-JD uploads, garbage text, out-of-order requests
 - [ ] **Eval: JD decoder output quality** — section counts, bullet length, tone
 
@@ -44,6 +49,13 @@
 - [ ] **Dynamic routing / sub-agent spawning** — replace forced linear state machine with an orchestrator that can dynamically route to skills, tools, or sub-agents based on context
 - [ ] Cancel mid-stream — pause/abort a response
 - [ ] Full end-to-end tests (Playwright) — deferred until core flow is stable
+
+---
+
+## Go-to-Market
+
+- [ ] **Marketing landing page** — external-facing page for PLG motion: headline, value prop, social proof, CTA to sign up. Separate from the in-app landing page.
+- [ ] **GTM plan for MVP** — define ICP, acquisition channel(s), activation metric, success criteria. Scope and execute before broader launch.
 
 ---
 
