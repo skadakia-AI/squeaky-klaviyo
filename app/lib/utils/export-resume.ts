@@ -1,6 +1,33 @@
 import { getServiceClient } from '../supabase'
 import type { Resume, TargetingOutput } from '../types'
 
+// Builds a human-readable download filename from resume owner name + session metadata.
+// Each segment is slugified (non-alphanumeric → hyphen, collapsed). Parts are capped
+// so the total stays well under OS filename limits.
+export function buildExportFilename(
+  resumeName: string,
+  company: string | null | undefined,
+  role: string | null | undefined,
+): string {
+  const slugify = (s: string, maxLen: number) =>
+    s.replace(/[^a-zA-Z0-9\s]/g, ' ').trim().replace(/\s+/g, '-').slice(0, maxLen)
+
+  const initials = resumeName
+    .split(/\s+/)
+    .filter(Boolean)
+    .slice(0, 4)
+    .map(w => w[0].toUpperCase())
+    .join('')
+
+  const parts = [
+    initials || null,
+    company ? slugify(company, 30) : null,
+    role ? slugify(role, 35) : null,
+  ].filter(Boolean)
+
+  return initials && parts.length >= 2 ? `${parts.join('_')}.docx` : 'resume.docx'
+}
+
 type ExportResumeInput = {
   sessionId: string
   userId: string
@@ -16,7 +43,7 @@ export async function exportResume(input: ExportResumeInput): Promise<ExportResu
   // ── 1. Fetch session ─────────────────────────────────────────────────────
   const { data: session, error: sessionError } = await supabase
     .from('sessions')
-    .select('bullet_reviews, bullet_edits, user_id')
+    .select('bullet_reviews, bullet_edits, user_id, company, role')
     .eq('id', input.sessionId)
     .single()
 
@@ -215,9 +242,11 @@ export async function exportResume(input: ExportResumeInput): Promise<ExportResu
     event: 'docx_downloaded',
   })
 
+  const filename = buildExportFilename(resume.name, session.company, session.role)
+
   const { data: urlData, error: urlError } = await supabase.storage
     .from('squeaky')
-    .createSignedUrl(storagePath, 3600)
+    .createSignedUrl(storagePath, 3600, { download: filename })
 
   if (urlError || !urlData) {
     return { success: false, error: 'UPLOAD_FAILED', message: 'File saved but couldn\'t generate download link. Try again.' }
