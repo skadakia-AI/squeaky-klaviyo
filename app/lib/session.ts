@@ -28,6 +28,7 @@ const initialState: ClientState = {
   bulletReviews: {},
   bulletEdits: {},
   unreviewedCount: 0,
+  quantificationQuestions: null,
   error: null,
 }
 
@@ -192,6 +193,10 @@ export function useSession() {
         setState(prev => applyStepComplete(prev, event.step, event.data))
         break
 
+      case 'quantification_needed':
+        setState(prev => ({ ...prev, quantificationQuestions: event.questions }))
+        break
+
       case 'error':
         setState(prev => {
           const messages = [...prev.messages]
@@ -206,7 +211,7 @@ export function useSession() {
             type: 'error',
             timestamp: Date.now(),
           })
-          return { ...prev, messages, error: { code: event.code, message: event.message }, isStreaming: false }
+          return { ...prev, messages, quantificationQuestions: null, error: { code: event.code, message: event.message }, isStreaming: false }
         })
         break
 
@@ -229,7 +234,7 @@ export function useSession() {
       timestamp: Date.now(),
     }
 
-    setState(prev => ({ ...prev, isStreaming: true, error: null, checkpoint: null, messages: message.silent ? prev.messages : [...prev.messages, userMsg] }))
+    setState(prev => ({ ...prev, isStreaming: true, error: null, checkpoint: null, quantificationQuestions: null, messages: message.silent ? prev.messages : [...prev.messages, userMsg] }))
 
     cleanupRef.current?.()
     cleanupRef.current = openStream(message, stateRef.current.sessionId, handleEvent)
@@ -278,6 +283,17 @@ export function useSession() {
     setState(prev => ({ ...prev, bulletEdits: { ...prev.bulletEdits, [bulletId]: text } }))
   }, [])
 
+  const submitQuantifications = useCallback((answers: string[]) => {
+    const questions = stateRef.current.quantificationQuestions
+    if (!questions) return
+    const lines = questions.map((q, i) => {
+      const answer = answers[i]?.trim()
+      return `- "${q.bullet}": ${answer || '(skipped)'}`
+    })
+    const text = `Here are the numbers:\n${lines.join('\n')}`
+    sendMessage({ type: 'text', content: text })
+  }, [sendMessage])
+
   const downloadResume = useCallback(async () => {
     const { sessionId, bulletReviews, bulletEdits } = stateRef.current
     if (!sessionId) return
@@ -313,6 +329,7 @@ export function useSession() {
     bulletReviews: state.bulletReviews,
     bulletEdits: state.bulletEdits,
     unreviewedCount: state.unreviewedCount,
+    quantificationQuestions: state.quantificationQuestions,
     error: state.error,
     pendingRecovery,
     sendMessage,
@@ -321,6 +338,7 @@ export function useSession() {
     acceptBullet,
     rejectBullet,
     editBullet,
+    submitQuantifications,
     downloadResume,
     clearCheckpoint,
     startNewSession,

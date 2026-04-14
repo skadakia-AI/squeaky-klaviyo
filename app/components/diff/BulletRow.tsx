@@ -77,7 +77,20 @@ export default function BulletRow({
         <div className="flex items-center gap-2 flex-wrap">
           {objective && <ObjectiveTag objective={objective} />}
           {unquantified && !flaggedForRemoval && <UnquantifiedBadge />}
-          <div className="ml-auto">
+          <div className="ml-auto flex items-center gap-1">
+            {!flaggedForRemoval && (
+              <button
+                onClick={() => setEditing(true)}
+                title="Edit rewrite"
+                className="w-7 h-7 flex items-center justify-center rounded"
+                style={{ backgroundColor: editing ? '#EFF6FF' : '#F3F4F6', color: '#6B7280', borderRadius: 4 }}
+              >
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" />
+                  <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" />
+                </svg>
+              </button>
+            )}
             <AcceptRejectToggle review={review} onAccept={onAccept} onReject={onReject} />
           </div>
         </div>

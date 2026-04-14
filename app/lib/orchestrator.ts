@@ -6,7 +6,7 @@ import { loadResume } from './utils/load-resume'
 import { exportResume } from './utils/export-resume'
 import { runJDDecoder } from './skills/jd-decoder'
 import { runJDMatchTurn1, runJDMatchTurn1Continue, runJDMatchTurn2 } from './skills/jd-match'
-import { runResumeTargetingTurn1, runResumeTargetingTurn2 } from './skills/resume-targeting'
+import { runResumeTargetingTurn1, runResumeTargetingTurn2, parseQuantificationQuestions } from './skills/resume-targeting'
 import { classifyIntent } from './intent-decoder'
 import { handleChat } from './handle-chat'
 import { resolveSessionContext } from './utils/session-context'
@@ -17,6 +17,7 @@ export type OrchestratorEvent =
   | { type: 'token'; content: string }
   | { type: 'message'; role: 'assistant'; content: string; progress?: boolean }
   | { type: 'step_complete'; step: CurrentStep; data?: unknown }
+  | { type: 'quantification_needed'; questions: { bullet: string; question: string }[] }
   | { type: 'error'; code: string; message: string }
   | { type: 'done' }
 
@@ -305,8 +306,14 @@ async function handleAssessed(
 
     if (!turn1Result.needsNumbers) {
       await runTurn2(sessionId, userId, emit)
+    } else {
+      // Emit structured questions so the client can show a fill-in-the-blank panel.
+      // Fall back gracefully: if parsing finds nothing, client shows the regular input.
+      const questions = parseQuantificationQuestions(turn1Result.turn1Text)
+      if (questions.length > 0) {
+        emit({ type: 'quantification_needed', questions })
+      }
     }
-    // else: wait for numbers response — stay in 'assessed'
     return
   }
 

@@ -3,6 +3,7 @@
 import Header from './Header'
 import ChatPane from '../chat/ChatPane'
 import DiffViewPanel from '../diff/DiffViewPanel'
+import QuantificationPanel from '../chat/QuantificationPanel'
 import { useSession } from '../../lib/session'
 
 export default function AppLayout() {
@@ -30,6 +31,14 @@ export default function AppLayout() {
           onReject={session.rejectBullet}
           onEdit={session.editBullet}
           onDownload={session.downloadResume}
+        />
+      )}
+
+      {session.quantificationQuestions && session.quantificationQuestions.length > 0 && (
+        <QuantificationPanel
+          questions={session.quantificationQuestions}
+          isStreaming={session.isStreaming}
+          onSubmit={session.submitQuantifications}
         />
       )}
     </div>

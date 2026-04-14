@@ -44,10 +44,14 @@ vi.mock('../../app/lib/skills/jd-match', () => ({
   runJDMatchTurn2: vi.fn(),
 }))
 
-vi.mock('../../app/lib/skills/resume-targeting', () => ({
-  runResumeTargetingTurn1: vi.fn(),
-  runResumeTargetingTurn2: vi.fn(),
-}))
+vi.mock('../../app/lib/skills/resume-targeting', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../../app/lib/skills/resume-targeting')>()
+  return {
+    ...actual,
+    runResumeTargetingTurn1: vi.fn(),
+    runResumeTargetingTurn2: vi.fn(),
+  }
+})
 
 vi.mock('../../app/lib/intent-decoder', () => ({
   classifyIntent: vi.fn(),
@@ -503,6 +507,42 @@ describe('assessed step', () => {
 
     expect(vi.mocked(runResumeTargetingTurn2)).not.toHaveBeenCalled()
     expect(events.some(e => e.type === 'step_complete' && e.step === 'targeted')).toBe(false)
+  })
+
+  it('emits quantification_needed with parsed questions when Turn 1 asks for numbers', async () => {
+    vi.mocked(classifyIntent).mockResolvedValue({ action: 'scope_confirm', confidence: 'high' })
+    const scopeMessage = { role: 'assistant' as const, content: "I'll rewrite Software Engineer at Acme Corp." }
+    vi.mocked(fetchMessages).mockResolvedValue([scopeMessage])
+    const turn1Text = `Before I rewrite, I need a few numbers:\n\n- Built a data pipeline — what was the daily data volume?\n- Led migration — how many services were migrated?`
+    vi.mocked(runResumeTargetingTurn1).mockResolvedValue({ success: true, turn1Text, needsNumbers: true })
+    vi.mocked(readFile).mockResolvedValue(JSON.stringify(mockResume))
+
+    const events = await run(
+      { type: 'text', content: 'yes' },
+      makeSession({ current_step: 'assessed', arc_alignment: 'strong' })
+    )
+
+    const qEvent = events.find(e => e.type === 'quantification_needed') as Extract<OrchestratorEvent, { type: 'quantification_needed' }> | undefined
+    expect(qEvent).toBeDefined()
+    expect(qEvent?.questions).toHaveLength(2)
+    expect(qEvent?.questions[0].bullet).toBe('Built a data pipeline')
+    expect(qEvent?.questions[0].question).toBe('what was the daily data volume?')
+  })
+
+  it('does not emit quantification_needed when Turn 1 output has no parseable questions', async () => {
+    vi.mocked(classifyIntent).mockResolvedValue({ action: 'scope_confirm', confidence: 'high' })
+    const scopeMessage = { role: 'assistant' as const, content: "I'll rewrite Software Engineer at Acme Corp." }
+    vi.mocked(fetchMessages).mockResolvedValue([scopeMessage])
+    // needsNumbers true but no parseable list — falls back to plain chat input
+    vi.mocked(runResumeTargetingTurn1).mockResolvedValue({ success: true, turn1Text: 'I need some numbers from you before proceeding.', needsNumbers: true })
+    vi.mocked(readFile).mockResolvedValue(JSON.stringify(mockResume))
+
+    const events = await run(
+      { type: 'text', content: 'yes' },
+      makeSession({ current_step: 'assessed', arc_alignment: 'strong' })
+    )
+
+    expect(events.some(e => e.type === 'quantification_needed')).toBe(false)
   })
 
   it('runs Turn 2 when user responds with numbers — classifier is bypassed', async () => {

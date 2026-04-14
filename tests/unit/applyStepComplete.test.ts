@@ -17,6 +17,7 @@ function buildState(overrides: Partial<ClientState> = {}): ClientState {
     bulletReviews: {},
     bulletEdits: {},
     unreviewedCount: 0,
+    quantificationQuestions: null,
     error: null,
     ...overrides,
   }

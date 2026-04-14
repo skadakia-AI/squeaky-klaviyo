@@ -84,11 +84,17 @@ export type OutboundMessage = {
   silent?: boolean
 }
 
+export interface QuantificationQuestion {
+  bullet: string
+  question: string
+}
+
 export type SSEEvent =
   | { type: 'session_created'; session_id: string }
   | { type: 'token'; content: string }
   | { type: 'message'; role: 'assistant'; content: string; progress?: boolean }
   | { type: 'step_complete'; step: CurrentStep; data?: unknown }
+  | { type: 'quantification_needed'; questions: QuantificationQuestion[] }
   | { type: 'error'; code: string; message: string }
   | { type: 'done' }
 
@@ -211,5 +217,6 @@ export interface ClientState {
   bulletReviews: Record<string, boolean>
   bulletEdits: Record<string, string>
   unreviewedCount: number
+  quantificationQuestions: QuantificationQuestion[] | null
   error: { code: string; message: string } | null
 }

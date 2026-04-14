@@ -40,7 +40,7 @@ vi.mock('path', () => ({
   join: vi.fn().mockReturnValue('/skills/resume-targeting.md'),
 }))
 
-import { runResumeTargetingTurn1, runResumeTargetingTurn2 } from '../../app/lib/skills/resume-targeting'
+import { runResumeTargetingTurn1, runResumeTargetingTurn2, parseQuantificationQuestions } from '../../app/lib/skills/resume-targeting'
 import { anthropic } from '../../app/lib/anthropic'
 import { readFile, writeFile } from '../../app/lib/utils/storage'
 import { fetchMessages } from '../../app/lib/utils/messages'
@@ -55,6 +55,52 @@ async function* makeStream(text: string) {
 beforeEach(() => {
   vi.clearAllMocks()
   vi.mocked(readFile).mockResolvedValue('{"name":"Test","experience":[],"education":[]}')
+})
+
+describe('parseQuantificationQuestions', () => {
+  it('parses standard em-dash format', () => {
+    const text = `Before I rewrite, I need a few numbers:
+
+- Built a data pipeline for daily ETL — what was the data volume processed per day?
+- Led migration to Kubernetes — what was the timeline and number of services migrated?
+
+Rough estimates are fine.`
+    const result = parseQuantificationQuestions(text)
+    expect(result).toHaveLength(2)
+    expect(result[0]).toEqual({
+      bullet: 'Built a data pipeline for daily ETL',
+      question: 'what was the data volume processed per day?',
+    })
+    expect(result[1]).toEqual({
+      bullet: 'Led migration to Kubernetes',
+      question: 'what was the timeline and number of services migrated?',
+    })
+  })
+
+  it('returns empty array when no questions are present', () => {
+    const text = "No numbers needed — I'll start rewriting."
+    expect(parseQuantificationQuestions(text)).toHaveLength(0)
+  })
+
+  it('handles en-dash separator variant', () => {
+    const text = '- Reduced deployment time – what was the before/after in minutes?'
+    const result = parseQuantificationQuestions(text)
+    expect(result).toHaveLength(1)
+    expect(result[0].question).toBe('what was the before/after in minutes?')
+  })
+
+  it('ignores non-list lines and prose', () => {
+    const text = `Before I rewrite, I need a few numbers:
+
+Some preamble here.
+
+- Managed a team of engineers — how many direct reports?
+
+Rough estimates are fine.`
+    const result = parseQuantificationQuestions(text)
+    expect(result).toHaveLength(1)
+    expect(result[0].bullet).toBe('Managed a team of engineers')
+  })
 })
 
 describe('runResumeTargetingTurn1', () => {
