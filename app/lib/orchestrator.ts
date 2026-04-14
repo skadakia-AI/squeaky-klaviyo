@@ -364,8 +364,8 @@ async function handleExport(
     downloaded_at: new Date().toISOString(),
   })
 
-  emit({ type: 'step_complete', step: 'exported' })
-  emit({ type: 'message', role: 'assistant', content: `Your resume is ready. [Download](${result.downloadUrl})` })
+  emit({ type: 'step_complete', step: 'exported', data: { downloadUrl: result.downloadUrl } })
+  emit({ type: 'message', role: 'assistant', content: 'Your resume is ready and downloading.' })
 }
 
 // ─── Intent context resolution ────────────────────────────────────────────────

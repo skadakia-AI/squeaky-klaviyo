@@ -185,6 +185,10 @@ export function useSession() {
         break
 
       case 'step_complete':
+        if (event.step === 'exported') {
+          const url = (event.data as { downloadUrl?: string })?.downloadUrl
+          if (url) window.open(url, '_blank')
+        }
         setState(prev => applyStepComplete(prev, event.step, event.data))
         break
 
@@ -225,7 +229,7 @@ export function useSession() {
       timestamp: Date.now(),
     }
 
-    setState(prev => ({ ...prev, isStreaming: true, error: null, checkpoint: null, messages: [...prev.messages, userMsg] }))
+    setState(prev => ({ ...prev, isStreaming: true, error: null, checkpoint: null, messages: message.silent ? prev.messages : [...prev.messages, userMsg] }))
 
     cleanupRef.current?.()
     cleanupRef.current = openStream(message, stateRef.current.sessionId, handleEvent)
@@ -284,7 +288,7 @@ export function useSession() {
       return
     }
 
-    sendMessage({ type: 'text', content: 'export' })
+    sendMessage({ type: 'text', content: 'export', silent: true })
   }, [sendMessage])
 
   const clearCheckpoint = useCallback(() => {

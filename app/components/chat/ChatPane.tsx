@@ -16,7 +16,7 @@ interface ChatPaneProps {
 export default function ChatPane({ session }: ChatPaneProps) {
   const { messages, isStreaming, checkpoint, currentStep, showDiffView,
     bulletReviews, bulletEdits, sendMessage, clearCheckpoint, acceptBullet, rejectBullet,
-    editBullet, pendingRecovery, continueSession, abandonSession } = session
+    editBullet, pendingRecovery, continueSession, abandonSession, startNewSession } = session
   const bottomRef = useRef<HTMLDivElement>(null)
   const [arcCorrectionMode, setArcCorrectionMode] = useState(false)
 
@@ -140,6 +140,21 @@ export default function ChatPane({ session }: ChatPaneProps) {
           }}
           disabled={isStreaming}
         />
+      ) : currentStep === 'exported' ? (
+        <div
+          className="fixed bottom-0 left-0 right-0"
+          style={{ borderTop: '1px solid #E5E7EB', backgroundColor: '#FFFFFF', height: 64 }}
+        >
+          <div className="mx-auto max-w-[680px] h-full flex items-center justify-center">
+            <button
+              onClick={startNewSession}
+              className="px-6 py-2 text-sm font-medium rounded"
+              style={{ backgroundColor: '#111827', color: '#FFFFFF', borderRadius: 6 }}
+            >
+              Start a new session
+            </button>
+          </div>
+        </div>
       ) : showInput ? (
         <InputArea placeholder={getPlaceholder()} disabled={isStreaming} onSend={handleSend} />
       ) : null}

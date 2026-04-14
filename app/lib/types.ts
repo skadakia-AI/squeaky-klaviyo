@@ -81,6 +81,7 @@ export type OutboundMessage = {
   content: string
   file_name?: string
   file_type?: string
+  silent?: boolean
 }
 
 export type SSEEvent =

@@ -571,6 +571,34 @@ describe('targeted step', () => {
     expect(events.some(e => e.type === 'step_complete' && e.step === 'exported')).toBe(true)
   })
 
+  it('passes downloadUrl in step_complete exported event data', async () => {
+    const downloadUrl = 'https://storage.example.com/export.docx'
+    vi.mocked(exportResume).mockResolvedValue({ success: true, downloadUrl, storagePath: 'users/user-1/session-1/export.docx' })
+
+    const events = await run(
+      { type: 'text', content: 'export' },
+      makeSession({ current_step: 'targeted' })
+    )
+
+    const exportedEvent = events.find(e => e.type === 'step_complete' && e.step === 'exported') as Extract<OrchestratorEvent, { type: 'step_complete' }> | undefined
+    expect(exportedEvent).toBeDefined()
+    expect((exportedEvent?.data as { downloadUrl?: string })?.downloadUrl).toBe(downloadUrl)
+  })
+
+  it('completion message does not contain a markdown link', async () => {
+    vi.mocked(exportResume).mockResolvedValue({ success: true, downloadUrl: 'https://storage.example.com/export.docx', storagePath: 'users/user-1/session-1/export.docx' })
+
+    const events = await run(
+      { type: 'text', content: 'export' },
+      makeSession({ current_step: 'targeted' })
+    )
+
+    const messages = events.filter(e => e.type === 'message') as Extract<OrchestratorEvent, { type: 'message' }>[]
+    const completionMsg = messages.find(m => m.content.includes('ready'))
+    expect(completionMsg).toBeDefined()
+    expect(completionMsg?.content).not.toMatch(/\[.*\]\(.*\)/)
+  })
+
   it('emits error and does not advance if export fails', async () => {
     vi.mocked(exportResume).mockResolvedValue({ success: false, error: 'EXPORT_FAILED', message: 'Could not generate DOCX' })
 
