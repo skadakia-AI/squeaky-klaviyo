@@ -59,8 +59,8 @@ const CONTEXT_CONFIGS: Record<IntentContext, ContextConfig> = {
     validActions: ['scope_confirm', 'scope_add', 'chat', 'unclear'],
     actionDescriptions: {
       scope_confirm: 'user agrees with the proposed set of roles to rewrite (e.g., "yes", "looks good", "that works", "go ahead")',
-      scope_add:     'user wants to add or change which roles are included in the rewrite (e.g., "also include X", "add my internship", "include all roles")',
-      chat:          'user is asking a question or making a conversational comment',
+      scope_add:     'user wants to add, remove, or change which roles are included — classify as scope_add ANY time the user mentions a company name, job title, or role (e.g., "also include X", "add my Citi role", "include everything", "what about my internship", "include all roles")',
+      chat:          'user is asking a process question that has nothing to do with which roles to include (e.g., "how many bullets will you rewrite?", "what does targeting mean?") — do NOT use chat when the user mentions a company or role name',
       unclear:       'cannot determine intent from the message',
     },
   },
