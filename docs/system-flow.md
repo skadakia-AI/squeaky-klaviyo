@@ -67,7 +67,7 @@ users/
       resume_structured.json ← written by loadResume, read by jd-match + resume-targeting
       fit_assessment.md      ← written by jd-match Turn 2
       targeted_resume.json   ← written by resume-targeting Turn 2
-      export.docx            ← written by exportResume
+      export.docx            ← written by exportResume (internal storage path; download filename is personalised)
 ```
 
 ---
@@ -145,6 +145,7 @@ A single server response may produce many events. They arrive in order over the 
 - **`token`** → appends the token text to the last assistant message bubble (or creates a new bubble if none exists)
 - **`message`** → adds a complete message bubble to the messages array; if `progress: true`, renders as a muted progress indicator
 - **`step_complete`** → calls `applyStepComplete(state, step, data)` to update UI state (see next section)
+- **`quantification_needed`** → stores the parsed question list in state; the browser renders `QuantificationPanel` (a full-screen overlay) instead of the normal text input. When the user submits answers, the panel assembles them into a plain-text message and calls `sendMessage` — Turn 2 receives it as ordinary conversation history.
 - **`error`** → removes any incomplete streaming bubble, adds an error message, sets `isStreaming: false`
 - **`done`** → sets `isStreaming: false`, re-enables input
 
@@ -235,7 +236,7 @@ When the user responds to the arc snapshot, two paths are possible:
 
 This is what makes multi-turn coherent across the stateless HTTP boundary. Each request to the server is independent — the server has no in-memory session state. The messages table is the conversation memory.
 
-Turn detection in the orchestrator works by counting stored messages: zero assistant messages for the current step means Turn 1 hasn't run yet. If a confirm arrives with no stored history (interrupted session, data loss), the orchestrator detects this and silently restarts Turn 1 rather than attempting Turn 2 on empty context.
+Turn detection in the orchestrator uses content matching, not message counting. The `hasTurn1Complete()` helper checks whether any stored assistant message contains one of two controlled phrases that the Turn 1 skill prompt instructs the LLM to print: `"No numbers needed"` (no quantification required) or `"Before I rewrite"` (quantification requested). A chat response stored during the same step will never contain either phrase, so it cannot be mistaken for a completed Turn 1. If a confirm arrives with no Turn 1 output in history (interrupted session, data loss), the orchestrator detects this and silently restarts Turn 1 rather than attempting Turn 2 on empty context.
 
 ---
 
@@ -299,6 +300,8 @@ When a user clicks a checkpoint button (e.g., "This is the right JD — continue
 | `assessed` (scope) | `'assessed_scope'` | scope_confirm, scope_add, chat, unclear |
 | `assessed` (numbers) | bypassed — returns `null` | any message triggers Turn 2 directly |
 
+**`scope_add`** — When the user asks to expand the targeting scope (e.g. "also include my other role"), the orchestrator includes all resume roles in scope and proceeds directly to the Turn 1 bullet audit without asking for a second confirmation. The user's statement is treated as an implicit go-ahead.
+
 The numbers sub-state bypasses the classifier entirely. Classifying "skip", "none", "proceed" is too ambiguous (e.g., "skip" in `assessed_pursue_or_pass` means pass on the role; in numbers context it means proceed without metrics). Since any user response in this sub-state should trigger Turn 2, the orchestrator skips classification and routes directly.
 
 **Which steps skip classification:**
@@ -352,7 +355,7 @@ Utilities are the I/O layer. They have no routing logic, no Claude calls, no sta
 | `update-session.ts` | Write session metadata (current_step, verdict, etc.) to the Supabase sessions table. |
 | `load-jd.ts` | Extract JD text from URL/PDF/plain text, validate it, write `raw_jd.md`, log events. |
 | `load-resume.ts` | Parse resume file (PDF/DOCX/text), call Haiku for structured extraction, write resume files, log events. |
-| `export-resume.ts` | Apply bullet reviews and edits, generate DOCX, write to storage, return signed download URL. |
+| `export-resume.ts` | Apply bullet reviews and edits, generate DOCX, write to storage, return signed download URL. Download filename is derived from the user's initials + session company + role (e.g. `SK_Acme-Corp_Senior-Engineer.docx`). |
 
 All utilities return `{ success: true, ...data }` or `{ success: false, error: string, message: string }`. They never throw. They never retry. The orchestrator decides what to do with failures.
 
