@@ -229,7 +229,9 @@ export function useSession() {
     const userMsg: ChatMessage = {
       id: crypto.randomUUID(),
       role: 'user',
-      content: message.type === 'file_upload' ? (message.file_name ?? 'Uploaded file') : message.content,
+      content: message.type === 'file_upload'
+        ? (message.file_name ?? 'Uploaded file')
+        : (message.display ?? message.content),
       type: message.type === 'file_upload' ? 'file_upload' : 'text',
       timestamp: Date.now(),
     }

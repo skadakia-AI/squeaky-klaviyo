@@ -450,6 +450,56 @@ describe('assessed step', () => {
     expect(vi.mocked(runResumeTargetingTurn1)).toHaveBeenCalled()
   })
 
+  it('scope_add includes all roles and runs Turn 1 immediately without re-confirmation', async () => {
+    vi.mocked(classifyIntent).mockResolvedValue({ action: 'scope_add', confidence: 'high' })
+    const scopeMessage = { role: 'assistant' as const, content: "I'll rewrite Software Engineer at Acme Corp." }
+    vi.mocked(fetchMessages).mockResolvedValue([scopeMessage])
+    vi.mocked(runResumeTargetingTurn1).mockResolvedValue({ success: true, turn1Text: 'No numbers needed — I\'ll start rewriting.', needsNumbers: false })
+    vi.mocked(runResumeTargetingTurn2).mockResolvedValue({
+      success: true,
+      targetingOutput: { rewrites: [], flagged_for_removal: [] },
+      bulletCount: 0,
+      resume: mockResume,
+    })
+    vi.mocked(readFile).mockResolvedValue(JSON.stringify(mockResume))
+
+    await run(
+      { type: 'text', content: 'also include my Senior Engineer role' },
+      makeSession({ current_step: 'assessed', arc_alignment: 'strong' })
+    )
+
+    expect(vi.mocked(runResumeTargetingTurn1)).toHaveBeenCalled()
+    // All roles should be in scope
+    const call = vi.mocked(runResumeTargetingTurn1).mock.calls[0]
+    expect(call[2]).toEqual(expect.arrayContaining(['r0', 'r1']))
+  })
+
+  it('a chat response between scope proposal and scope_confirm does not corrupt Turn 1 detection', async () => {
+    // Scope proposed, then a chat response stored, then scope_confirm arrives.
+    // hasTurn1Complete must remain false because neither "No numbers needed" nor
+    // "Before I rewrite" appears in the stored messages.
+    const scopeMessage = { role: 'assistant' as const, content: "I'll rewrite Software Engineer at Acme Corp." }
+    const chatResponse = { role: 'assistant' as const, content: 'Angelo Gordon is evaluated in the fit assessment.' }
+    vi.mocked(fetchMessages).mockResolvedValue([scopeMessage, chatResponse])
+    vi.mocked(runResumeTargetingTurn1).mockResolvedValue({ success: true, turn1Text: 'No numbers needed — I\'ll start rewriting.', needsNumbers: false })
+    vi.mocked(runResumeTargetingTurn2).mockResolvedValue({
+      success: true,
+      targetingOutput: { rewrites: [], flagged_for_removal: [] },
+      bulletCount: 0,
+      resume: mockResume,
+    })
+    vi.mocked(readFile).mockResolvedValue(JSON.stringify(mockResume))
+
+    const events = await run(
+      { type: 'checkpoint', content: 'scope_confirm' },
+      makeSession({ current_step: 'assessed', arc_alignment: 'strong' })
+    )
+
+    // Turn 1 must have run — the chat response should not have been mistaken for it
+    expect(vi.mocked(runResumeTargetingTurn1)).toHaveBeenCalled()
+    expect(events.some(e => e.type === 'step_complete' && e.step === 'targeted')).toBe(true)
+  })
+
   it('runs Turn 1 after scope is proposed and confirmed', async () => {
     vi.mocked(classifyIntent).mockResolvedValue({ action: 'scope_confirm', confidence: 'high' })
     const scopeMessage = { role: 'assistant' as const, content: "I'll rewrite Software Engineer at Acme Corp." }
@@ -547,6 +597,7 @@ describe('assessed step', () => {
 
   it('runs Turn 2 when user responds with numbers — classifier is bypassed', async () => {
     // Numbers sub-state bypasses the intent classifier entirely; any response triggers Turn 2.
+    // The "Before I rewrite" phrase in the Turn 1 output is what signals hasTurn1Complete.
     const numbersMessage = { role: 'assistant' as const, content: 'Before I rewrite, I need a few numbers.' }
     vi.mocked(fetchMessages).mockResolvedValue([
       { role: 'assistant' as const, content: "I'll rewrite Software Engineer at Acme Corp." },
@@ -570,7 +621,8 @@ describe('assessed step', () => {
   })
 
   it('runs Turn 2 when user says "skip" in numbers sub-state — bypasses classifier', async () => {
-    const numbersMessage = { role: 'assistant' as const, content: 'I need numbers to quantify your impact.' }
+    // Uses "Before I rewrite" so hasTurn1Complete correctly detects Turn 1 ran.
+    const numbersMessage = { role: 'assistant' as const, content: 'Before I rewrite, I need a few numbers.' }
     vi.mocked(fetchMessages).mockResolvedValue([
       { role: 'assistant' as const, content: "I'll rewrite Software Engineer at Acme Corp." },
       numbersMessage,

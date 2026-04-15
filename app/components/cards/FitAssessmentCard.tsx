@@ -10,7 +10,7 @@ const VERDICT_STYLES: Record<string, { bg: string; text: string; label: string }
 interface FitAssessmentCardProps {
   data: FitAssessmentData
   content: string
-  onChoice: (value: string) => void
+  onChoice: (value: string, display: string) => void
   disabled: boolean
 }
 
@@ -54,7 +54,7 @@ export default function FitAssessmentCard({ data, content, onChoice, disabled }:
         style={{ borderTop: '1px solid #E5E7EB', backgroundColor: '#F9FAFB' }}
       >
         <button
-          onClick={() => onChoice('confirm')}
+          onClick={() => onChoice('confirm', 'Tailor my resume')}
           disabled={disabled}
           className="px-4 py-2 text-sm font-medium rounded"
           style={{
@@ -66,7 +66,7 @@ export default function FitAssessmentCard({ data, content, onChoice, disabled }:
           Tailor my resume
         </button>
         <button
-          onClick={() => onChoice('pass')}
+          onClick={() => onChoice('pass', 'Skip this role')}
           disabled={disabled}
           className="px-4 py-2 text-sm rounded"
           style={{

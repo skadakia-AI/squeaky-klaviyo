@@ -115,7 +115,7 @@ export default function ChatPane({ session }: ChatPaneProps) {
             onAccept={acceptBullet}
             onReject={rejectBullet}
             onEdit={editBullet}
-            onCheckpointChoice={(val) => sendMessage({ type: 'checkpoint', content: val })}
+            onCheckpointChoice={(val, display) => sendMessage({ type: 'checkpoint', content: val, display })}
           />
           <div ref={bottomRef} />
         </div>
@@ -127,7 +127,7 @@ export default function ChatPane({ session }: ChatPaneProps) {
           type="arc_confirmation"
           onChoice={(val) => {
             if (val === 'correct') { clearCheckpoint(); setArcCorrectionMode(true) }
-            else sendMessage({ type: 'checkpoint', content: val })
+            else sendMessage({ type: 'checkpoint', content: val, display: 'Looks right — assess fit' })
           }}
           disabled={isStreaming}
         />
@@ -136,7 +136,7 @@ export default function ChatPane({ session }: ChatPaneProps) {
           type="scope_selection"
           onChoice={(val) => {
             if (val === 'adjust') { clearCheckpoint() }
-            else sendMessage({ type: 'checkpoint', content: val })
+            else sendMessage({ type: 'checkpoint', content: val, display: 'This scope works' })
           }}
           disabled={isStreaming}
         />

@@ -79,6 +79,7 @@ export interface CredibilityCheck {
 export type OutboundMessage = {
   type: 'text' | 'file_upload' | 'checkpoint'
   content: string
+  display?: string   // human-readable label shown in the chat bubble (defaults to content)
   file_name?: string
   file_type?: string
   silent?: boolean

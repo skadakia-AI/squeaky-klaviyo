@@ -273,17 +273,17 @@ async function handleAssessed(
   }
 
   // Sub-state 2: scope proposed, Turn 1 not yet run
-  const hasTurn1 = assistantMessages.length >= 2 ||
-    (assistantMessages.length === 1 && !assistantMessages[0].content.includes("I'll rewrite"))
-
-  if (!hasTurn1) {
-    // Scope just confirmed — run Turn 1
+  if (!hasTurn1Complete(assistantMessages)) {
+    // Scope confirmed or user expanding scope — run Turn 1
     const resume: Resume = JSON.parse(await readFile(userId, sessionId, 'resume_structured.json'))
     const roles = resume.experience ?? []
     const arcAlignment = session.arc_alignment as string
 
     let scopeIds: string[]
-    if (resolvedAction === 'scope_confirm') {
+    if (resolvedAction === 'scope_add') {
+      // User wants to expand — include all roles and proceed without re-confirming
+      scopeIds = roles.map(r => r.id)
+    } else if (resolvedAction === 'scope_confirm') {
       const scopeCount = arcAlignment === 'weak' ? 1 : 2
       scopeIds = roles.slice(0, scopeCount).map(r => r.id)
     } else {
@@ -375,6 +375,19 @@ async function handleExport(
   emit({ type: 'message', role: 'assistant', content: 'Your resume is ready and downloading.' })
 }
 
+// ─── Helpers ─────────────────────────────────────────────────────────────────
+
+// Determines whether the resume-targeting Turn 1 bullet audit has already run
+// for this session. Uses content matching against the two controlled output
+// phrases the skill prompt instructs Turn 1 to print — reliable regardless of
+// how many other messages (e.g. chat responses) are also stored under 'assessed'.
+function hasTurn1Complete(assistantMessages: { content: string }[]): boolean {
+  return assistantMessages.some(m =>
+    m.content.includes('No numbers needed') ||
+    m.content.includes('Before I rewrite')
+  )
+}
+
 // ─── Intent context resolution ────────────────────────────────────────────────
 // Maps the current step to the right IntentContext for classification.
 // For the assessed step, the sub-state is inferred from stored message history.
@@ -387,9 +400,7 @@ async function resolveIntentContext(sessionId: string, step: CurrentStep): Promi
       const messages = await fetchMessages(sessionId, 'assessed')
       const assistantMessages = messages.filter(m => m.role === 'assistant')
       if (assistantMessages.length === 0) return 'assessed_pursue_or_pass'
-      const hasTurn1 = assistantMessages.length >= 2 ||
-        (assistantMessages.length === 1 && !assistantMessages[0].content.includes("I'll rewrite"))
-      if (!hasTurn1) return 'assessed_scope'
+      if (!hasTurn1Complete(assistantMessages)) return 'assessed_scope'
       const last = assistantMessages[assistantMessages.length - 1]
       const askedForNumbers = !last.content.includes('No numbers needed')
       // Bypass the classifier when waiting for numbers — any user response triggers Turn 2.

@@ -14,7 +14,7 @@ interface MessageListProps {
   onAccept: (bulletId: string) => void
   onReject: (bulletId: string) => void
   onEdit: (bulletId: string, text: string) => void
-  onCheckpointChoice: (value: string) => void
+  onCheckpointChoice: (value: string, display?: string) => void
 }
 
 export default function MessageList({
@@ -47,7 +47,7 @@ export default function MessageList({
                 key={msg.id}
                 data={msg.data as FitAssessmentData}
                 content={msg.content}
-                onChoice={onCheckpointChoice}
+                onChoice={(value, display) => onCheckpointChoice(value, display)}
                 disabled={isStreaming}
               />
             )
