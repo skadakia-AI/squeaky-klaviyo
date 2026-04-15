@@ -450,28 +450,71 @@ describe('assessed step', () => {
     expect(vi.mocked(runResumeTargetingTurn1)).toHaveBeenCalled()
   })
 
-  it('scope_add includes all roles and runs Turn 1 immediately without re-confirmation', async () => {
+  it('scope_add with a named role adds that role to the base scope', async () => {
     vi.mocked(classifyIntent).mockResolvedValue({ action: 'scope_add', confidence: 'high' })
-    const scopeMessage = { role: 'assistant' as const, content: "I'll rewrite Software Engineer at Acme Corp." }
+    const threeRoleResume: Resume = {
+      name: 'Test User',
+      experience: [
+        { id: 'r0', company: 'Acme Corp', title: 'Software Engineer', bullets: [{ id: 'r0-b0', text: 'Built things' }] },
+        { id: 'r1', company: 'Beta Inc', title: 'Senior Engineer', bullets: [{ id: 'r1-b0', text: 'Led team' }] },
+        { id: 'r2', company: 'Citi', title: 'Analyst', bullets: [{ id: 'r2-b0', text: 'Modeled things' }] },
+      ],
+      education: [],
+    }
+    const scopeMessage = { role: 'assistant' as const, content: "I'll rewrite Software Engineer at Acme Corp and Senior Engineer at Beta Inc." }
     vi.mocked(fetchMessages).mockResolvedValue([scopeMessage])
     vi.mocked(runResumeTargetingTurn1).mockResolvedValue({ success: true, turn1Text: 'No numbers needed — I\'ll start rewriting.', needsNumbers: false })
     vi.mocked(runResumeTargetingTurn2).mockResolvedValue({
       success: true,
       targetingOutput: { rewrites: [], flagged_for_removal: [] },
       bulletCount: 0,
-      resume: mockResume,
+      resume: threeRoleResume,
     })
-    vi.mocked(readFile).mockResolvedValue(JSON.stringify(mockResume))
+    vi.mocked(readFile).mockResolvedValue(JSON.stringify(threeRoleResume))
 
     await run(
-      { type: 'text', content: 'also include my Senior Engineer role' },
+      { type: 'text', content: 'how about my Citi role' },
       makeSession({ current_step: 'assessed', arc_alignment: 'strong' })
     )
 
     expect(vi.mocked(runResumeTargetingTurn1)).toHaveBeenCalled()
-    // All roles should be in scope
     const call = vi.mocked(runResumeTargetingTurn1).mock.calls[0]
-    expect(call[2]).toEqual(expect.arrayContaining(['r0', 'r1']))
+    // Should include base (r0, r1) + the named Citi role (r2), but NOT just all roles by default
+    expect(call[2]).toEqual(expect.arrayContaining(['r0', 'r1', 'r2']))
+    expect(call[2]).toHaveLength(3)
+  })
+
+  it('scope_add with no recognisable role name falls back to all roles', async () => {
+    vi.mocked(classifyIntent).mockResolvedValue({ action: 'scope_add', confidence: 'high' })
+    const threeRoleResume: Resume = {
+      name: 'Test User',
+      experience: [
+        { id: 'r0', company: 'Acme Corp', title: 'Software Engineer', bullets: [{ id: 'r0-b0', text: 'Built things' }] },
+        { id: 'r1', company: 'Beta Inc', title: 'Senior Engineer', bullets: [{ id: 'r1-b0', text: 'Led team' }] },
+        { id: 'r2', company: 'Citi', title: 'Analyst', bullets: [{ id: 'r2-b0', text: 'Modeled things' }] },
+      ],
+      education: [],
+    }
+    const scopeMessage = { role: 'assistant' as const, content: "I'll rewrite Software Engineer at Acme Corp and Senior Engineer at Beta Inc." }
+    vi.mocked(fetchMessages).mockResolvedValue([scopeMessage])
+    vi.mocked(runResumeTargetingTurn1).mockResolvedValue({ success: true, turn1Text: 'No numbers needed — I\'ll start rewriting.', needsNumbers: false })
+    vi.mocked(runResumeTargetingTurn2).mockResolvedValue({
+      success: true,
+      targetingOutput: { rewrites: [], flagged_for_removal: [] },
+      bulletCount: 0,
+      resume: threeRoleResume,
+    })
+    vi.mocked(readFile).mockResolvedValue(JSON.stringify(threeRoleResume))
+
+    await run(
+      { type: 'text', content: 'include all my experience' },
+      makeSession({ current_step: 'assessed', arc_alignment: 'strong' })
+    )
+
+    expect(vi.mocked(runResumeTargetingTurn1)).toHaveBeenCalled()
+    const call = vi.mocked(runResumeTargetingTurn1).mock.calls[0]
+    expect(call[2]).toEqual(expect.arrayContaining(['r0', 'r1', 'r2']))
+    expect(call[2]).toHaveLength(3)
   })
 
   it('a chat response between scope proposal and scope_confirm does not corrupt Turn 1 detection', async () => {
@@ -733,6 +776,23 @@ describe('chat bypass', () => {
 
     expect(vi.mocked(handleChat)).toHaveBeenCalled()
     expect(vi.mocked(runJDMatchTurn2)).not.toHaveBeenCalled()
+  })
+
+  it('emits a static re-prompt for unclear intent in assessed_scope — does not call handleChat or advance state', async () => {
+    vi.mocked(classifyIntent).mockResolvedValue({ action: 'unclear', confidence: 'low' })
+    const scopeMessage = { role: 'assistant' as const, content: "I'll rewrite Software Engineer at Acme Corp." }
+    vi.mocked(fetchMessages).mockResolvedValue([scopeMessage])
+
+    const events = await run(
+      { type: 'text', content: 'hmm' },
+      makeSession({ current_step: 'assessed', arc_alignment: 'strong' })
+    )
+
+    expect(vi.mocked(handleChat)).not.toHaveBeenCalled()
+    expect(vi.mocked(runResumeTargetingTurn1)).not.toHaveBeenCalled()
+    expect(vi.mocked(updateSession)).not.toHaveBeenCalled()
+    expect(events.some(e => e.type === 'message' && e.role === 'assistant')).toBe(true)
+    expect(events.some(e => e.type === 'step_complete')).toBe(false)
   })
 
   it('calls resolveSessionContext before handleChat and passes the result', async () => {

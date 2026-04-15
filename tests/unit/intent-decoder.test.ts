@@ -139,16 +139,36 @@ describe('assessed_scope context', () => {
     expect(result).toEqual({ action: 'scope_add', confidence: 'high' })
   })
 
-  it('returns chat for a question about scope', async () => {
+  it('returns unclear when LLM returns chat (chat is not valid for assessed_scope)', async () => {
     mockLLMResponse('chat')
     const result = await classifyIntent('assessed_scope', 'why only two roles?')
-    expect(result).toEqual({ action: 'chat', confidence: 'high' })
+    expect(result).toEqual({ action: 'unclear', confidence: 'low' })
   })
 
   it('returns unclear when LLM returns confirm, not valid here', async () => {
     mockLLMResponse('confirm')
     const result = await classifyIntent('assessed_scope', 'yes')
     expect(result).toEqual({ action: 'unclear', confidence: 'low' })
+  })
+})
+
+// ─── Markdown stripping ───────────────────────────────────────────────────────
+
+describe('markdown code fence stripping', () => {
+  it('parses correctly when model wraps JSON in a markdown code block', async () => {
+    vi.mocked(anthropic.messages.create).mockResolvedValue({
+      content: [{ type: 'text', text: '```json\n{"action": "scope_add", "confidence": "high"}\n```' }],
+    } as never)
+    const result = await classifyIntent('assessed_scope', 'How about Citigroup?')
+    expect(result).toEqual({ action: 'scope_add', confidence: 'high' })
+  })
+
+  it('parses correctly when model wraps JSON in a code block without language tag', async () => {
+    vi.mocked(anthropic.messages.create).mockResolvedValue({
+      content: [{ type: 'text', text: '```\n{"action": "confirm", "confidence": "high"}\n```' }],
+    } as never)
+    const result = await classifyIntent('jd_loaded', 'yes')
+    expect(result).toEqual({ action: 'confirm', confidence: 'high' })
   })
 })
 

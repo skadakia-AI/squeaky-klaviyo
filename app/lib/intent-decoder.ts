@@ -56,11 +56,10 @@ const CONTEXT_CONFIGS: Record<IntentContext, ContextConfig> = {
 
   assessed_scope: {
     pendingPrompt: '"Does this targeting scope work, or do you want to include other roles?"',
-    validActions: ['scope_confirm', 'scope_add', 'chat', 'unclear'],
+    validActions: ['scope_confirm', 'scope_add', 'unclear'],
     actionDescriptions: {
-      scope_confirm: 'user agrees with the proposed set of roles to rewrite (e.g., "yes", "looks good", "that works", "go ahead")',
-      scope_add:     'user wants to add, remove, or change which roles are included — classify as scope_add ANY time the user mentions a company name, job title, or role (e.g., "also include X", "add my Citi role", "include everything", "what about my internship", "include all roles")',
-      chat:          'user is asking a process question that has nothing to do with which roles to include (e.g., "how many bullets will you rewrite?", "what does targeting mean?") — do NOT use chat when the user mentions a company or role name',
+      scope_confirm: 'user confirms the proposed scope — any short affirmative ("yes", "sure", "ok", "looks good", "that works", "go ahead") AND statements that name the proposed roles without requesting changes (e.g., "just those two", "only Tangify and AG", "let\'s do those")',
+      scope_add:     'user wants to add or change which roles are included — ANY mention of a company name, job title, or role that is not already in the proposed scope (e.g., "also include X", "how about my Citi role", "add my internship", "include all roles", "what about my [company] experience")',
       unclear:       'cannot determine intent from the message',
     },
   },
@@ -114,7 +113,10 @@ export async function classifyIntent(
       messages: [{ role: 'user', content: userPrompt }],
     })
 
-    const text = response.content[0].type === 'text' ? response.content[0].text.trim() : ''
+    const raw = response.content[0].type === 'text' ? response.content[0].text.trim() : ''
+    console.log('[intent]', context, JSON.stringify(userMessage), '->', raw)
+    // Strip markdown code fences — model may wrap JSON despite "no markdown" instruction
+    const text = raw.replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/, '').trim()
 
     let parsed: { action?: string; confidence?: string }
     try {

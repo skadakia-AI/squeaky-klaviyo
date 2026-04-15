@@ -58,6 +58,10 @@ export async function runOrchestrator(
     if (context) {
       const intent = await classifyIntent(context, message.content)
       if (intent.action === 'chat' || intent.action === 'unclear') {
+        if (context === 'assessed_scope') {
+          emit({ type: 'message', role: 'assistant', content: 'Does the proposed scope work for you, or would you like to include different roles?' })
+          return
+        }
         const artifactContext = await resolveSessionContext(userId, sessionId)
         await handleChat(sessionId, userId, message.content, context, artifactContext, emit)
         return
@@ -281,8 +285,14 @@ async function handleAssessed(
 
     let scopeIds: string[]
     if (resolvedAction === 'scope_add') {
-      // User wants to expand — include all roles and proceed without re-confirming
-      scopeIds = roles.map(r => r.id)
+      // Include base scope + any roles the user specifically named.
+      // Falls back to all roles if the message doesn't mention a recognisable name.
+      const baseScopeCount = arcAlignment === 'weak' ? 1 : 2
+      const baseIds = roles.slice(0, baseScopeCount).map(r => r.id)
+      const mentionedIds = extractMentionedRoles(message.content, roles)
+      scopeIds = mentionedIds.length > 0
+        ? [...new Set([...baseIds, ...mentionedIds])]
+        : roles.map(r => r.id)
     } else if (resolvedAction === 'scope_confirm') {
       const scopeCount = arcAlignment === 'weak' ? 1 : 2
       scopeIds = roles.slice(0, scopeCount).map(r => r.id)
@@ -386,6 +396,18 @@ function hasTurn1Complete(assistantMessages: { content: string }[]): boolean {
     m.content.includes('No numbers needed') ||
     m.content.includes('Before I rewrite')
   )
+}
+
+// Returns the IDs of resume roles whose company or title appear in the user's message.
+// Used to scope a scope_add action to the roles the user actually named.
+function extractMentionedRoles(userMessage: string, roles: Resume['experience']): string[] {
+  const lower = userMessage.toLowerCase()
+  return roles
+    .filter(r =>
+      lower.includes(r.company.toLowerCase()) ||
+      lower.includes(r.title.toLowerCase())
+    )
+    .map(r => r.id)
 }
 
 // ─── Intent context resolution ────────────────────────────────────────────────
