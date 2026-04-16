@@ -49,7 +49,7 @@ export async function runJDDecoder(
     return { success: false, code: 'API_ERROR', message: 'The analysis failed. Please try again.' }
   }
 
-  const headerMatch = decodedText.match(/^# JD Decoded: (.+?) @ (.+)$/m)
+  const headerMatch = decodedText.match(/^# (.+?) @ (.+)$/m)
   const roleTitle = headerMatch?.[1]?.trim() ?? ''
   const company = headerMatch?.[2]?.trim() ?? ''
   const slug = `${company}-${roleTitle}`.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '')

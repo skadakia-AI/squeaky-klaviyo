@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { applyStepComplete, applyDone } from '../../app/lib/session'
+import { applyStepComplete, applyDone, parseVerdictFromText } from '../../app/lib/session'
 import type { ClientState, ChatMessage, CurrentStep } from '../../app/lib/types'
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -302,5 +302,70 @@ describe('default (unknown step)', () => {
     expect(next.currentStep).toBe('abandoned')
     expect(next.showDiffView).toBe(true)
     expect(next.checkpoint).toBe('arc_confirmation')
+  })
+})
+
+// ─── parseVerdictFromText ─────────────────────────────────────────────────────
+
+describe('parseVerdictFromText', () => {
+  const fullBlock = [
+    '## Verdict',
+    'verdict: no-brainer',
+    'hard_req_status: all met',
+    'arc_alignment: strong',
+    'key_factors: factor one; factor two',
+    '',
+    '---',
+    '',
+    '# Fit Assessment: Engineer @ Acme',
+    '## Hard Requirements',
+    '- Backend depth: Met — 5 years Node',
+  ].join('\n')
+
+  it('returns null when content has no verdict field', () => {
+    expect(parseVerdictFromText('some regular assistant text')).toBeNull()
+  })
+
+  it('returns null when verdict value is not one of the three valid verdicts', () => {
+    expect(parseVerdictFromText('verdict: pretty good\narc_alignment: strong')).toBeNull()
+  })
+
+  it('parses a complete verdict block with all fields', () => {
+    const result = parseVerdictFromText(fullBlock)
+    expect(result).not.toBeNull()
+    expect(result?.verdict).toBe('no-brainer')
+    expect(result?.arc_alignment).toBe('strong')
+    expect(result?.hard_req_status).toBe('all met')
+    expect(result?.key_factors).toBe('factor one; factor two')
+  })
+
+  it('handles stretch but doable verdict', () => {
+    const content = 'verdict: stretch but doable\narc_alignment: partial\nkey_factors: needs narrative work'
+    const result = parseVerdictFromText(content)
+    expect(result?.verdict).toBe('stretch but doable')
+    expect(result?.arc_alignment).toBe('partial')
+  })
+
+  it('handles not a fit verdict', () => {
+    const content = 'verdict: not a fit\narc_alignment: weak\nkey_factors: missing core skills\nhard_req_status: not met: salesforce'
+    const result = parseVerdictFromText(content)
+    expect(result?.verdict).toBe('not a fit')
+    expect(result?.arc_alignment).toBe('weak')
+  })
+
+  it('returns a result from mid-stream content that only has the verdict block so far', () => {
+    const partial = '## Verdict\nverdict: no-brainer\nhard_req_status: all met\narc_alignment: strong\nkey_factors: deep domain fit'
+    const result = parseVerdictFromText(partial)
+    expect(result?.verdict).toBe('no-brainer')
+    expect(result?.key_factors).toBe('deep domain fit')
+  })
+
+  it('returns empty strings for missing optional fields rather than crashing', () => {
+    const minimal = 'verdict: not a fit'
+    const result = parseVerdictFromText(minimal)
+    expect(result?.verdict).toBe('not a fit')
+    expect(result?.arc_alignment).toBe('')
+    expect(result?.key_factors).toBe('')
+    expect(result?.hard_req_status).toBe('')
   })
 })

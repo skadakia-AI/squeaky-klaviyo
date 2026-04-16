@@ -50,11 +50,11 @@ Make all reasoning explicit — the user needs to be able to catch misreads.
 
 ---
 
-## Step 4 — Arc alignment
+## Step 4 — Career narrative fit
 
-Map the resume against Section 11's no-brainer narrative and signals.
+Map the resume against the no-brainer hiring profile from the decoded JD.
 
-For each signal listed in Section 11: **Present / Partial / Absent** — with a brief evidence note.
+For each signal in the no-brainer profile: **Present / Partial / Absent** — with a brief evidence note.
 
 Follow with a narrative judgment (3–5 sentences): how close is this arc to the no-brainer profile, and what specifically is the gap?
 
@@ -102,8 +102,11 @@ key_factors: [one line, under 100 characters — the 2–3 deciding factors]
 - [Requirement]: Partial — [what's present / what's missing]
 - [Requirement]: Not Met — [what's absent]
 
-## Arc Alignment: [Strong / Partial / Weak]
-[3–5 sentences with specific resume evidence mapped against Section 11]
+## Career Narrative Fit: [Strong / Partial / Weak]
+[3–5 sentences with specific resume evidence mapped against the no-brainer profile]
+
+No-brainer hiring signals:
+- [Signal]: Present / Partial / Absent — [brief evidence note]
 
 ## Soft Requirements
 [Meaningful absences with offsets noted. Omit if nothing notable.]
@@ -114,5 +117,8 @@ key_factors: [one line, under 100 characters — the 2–3 deciding factors]
 3. [Factor]
 
 ## What Narrative Work Needs to Accomplish
-[Stretch only: specific gaps + whether raw material exists. Omit for other verdicts.]
+[Stretch only: specific gaps + whether raw material exists. Omit for not-a-fit or no-brainer verdicts.]
+
+## Structural Gaps
+[Not a fit only: explain why the gaps are structural, not cosmetic, and note what role type would be a better fit for this candidate. Omit for other verdicts.]
 ```

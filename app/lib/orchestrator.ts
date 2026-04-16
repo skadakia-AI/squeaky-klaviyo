@@ -293,6 +293,12 @@ async function handleAssessed(
       scopeIds = mentionedIds.length > 0
         ? [...new Set([...baseIds, ...mentionedIds])]
         : roles.map(r => r.id)
+
+      const scopedRoles = roles.filter(r => scopeIds.includes(r.id))
+      const roleList = scopedRoles.map(r => `${r.title} at ${r.company}`).join(' and ')
+      const confirmMsg = `Got it — I'll rewrite ${roleList}.`
+      await storeMessage(sessionId, 'assistant', confirmMsg, 'assessed')
+      emit({ type: 'message', role: 'assistant', content: confirmMsg })
     } else if (resolvedAction === 'scope_confirm') {
       const scopeCount = arcAlignment === 'weak' ? 1 : 2
       scopeIds = roles.slice(0, scopeCount).map(r => r.id)

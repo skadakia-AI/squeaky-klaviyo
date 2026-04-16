@@ -472,7 +472,7 @@ describe('assessed step', () => {
     })
     vi.mocked(readFile).mockResolvedValue(JSON.stringify(threeRoleResume))
 
-    await run(
+    const events = await run(
       { type: 'text', content: 'how about my Citi role' },
       makeSession({ current_step: 'assessed', arc_alignment: 'strong' })
     )
@@ -482,6 +482,12 @@ describe('assessed step', () => {
     // Should include base (r0, r1) + the named Citi role (r2), but NOT just all roles by default
     expect(call[2]).toEqual(expect.arrayContaining(['r0', 'r1', 'r2']))
     expect(call[2]).toHaveLength(3)
+
+    const confirmEvent = events.find(e => e.type === 'message' && 'content' in e && (e as { content: string }).content.startsWith('Got it —'))
+    expect(confirmEvent).toBeDefined()
+    expect((confirmEvent as { content: string }).content).toContain('Software Engineer at Acme Corp')
+    expect((confirmEvent as { content: string }).content).toContain('Senior Engineer at Beta Inc')
+    expect((confirmEvent as { content: string }).content).toContain('Analyst at Citi')
   })
 
   it('scope_add with no recognisable role name falls back to all roles', async () => {
@@ -506,7 +512,7 @@ describe('assessed step', () => {
     })
     vi.mocked(readFile).mockResolvedValue(JSON.stringify(threeRoleResume))
 
-    await run(
+    const events = await run(
       { type: 'text', content: 'include all my experience' },
       makeSession({ current_step: 'assessed', arc_alignment: 'strong' })
     )
@@ -515,6 +521,12 @@ describe('assessed step', () => {
     const call = vi.mocked(runResumeTargetingTurn1).mock.calls[0]
     expect(call[2]).toEqual(expect.arrayContaining(['r0', 'r1', 'r2']))
     expect(call[2]).toHaveLength(3)
+
+    const confirmEvent = events.find(e => e.type === 'message' && 'content' in e && (e as { content: string }).content.startsWith('Got it —'))
+    expect(confirmEvent).toBeDefined()
+    expect((confirmEvent as { content: string }).content).toContain('Software Engineer at Acme Corp')
+    expect((confirmEvent as { content: string }).content).toContain('Senior Engineer at Beta Inc')
+    expect((confirmEvent as { content: string }).content).toContain('Analyst at Citi')
   })
 
   it('a chat response between scope proposal and scope_confirm does not corrupt Turn 1 detection', async () => {

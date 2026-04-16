@@ -16,6 +16,27 @@ import type {
 import { getActiveSession, postReviews } from './api'
 import { openStream } from './sse'
 
+// Parses the machine-readable verdict block out of raw LLM output text.
+// Used for live streaming (render card as tokens arrive) and session recovery
+// (toMsg promotes stored assistant messages that contain a verdict block).
+// Returns null if the content doesn't look like a fit assessment.
+export function parseVerdictFromText(
+  content: string
+): Pick<FitAssessmentData, 'verdict' | 'arc_alignment' | 'key_factors' | 'hard_req_status'> | null {
+  if (!content.includes('verdict:')) return null
+  const get = (field: string) =>
+    content.match(new RegExp(`^${field}:\\s*(.+)$`, 'm'))?.[1]?.trim() ?? ''
+  const verdict = get('verdict')
+  const validVerdicts: FitAssessmentData['verdict'][] = ['no-brainer', 'stretch but doable', 'not a fit']
+  if (!validVerdicts.includes(verdict as FitAssessmentData['verdict'])) return null
+  return {
+    verdict: verdict as FitAssessmentData['verdict'],
+    arc_alignment: get('arc_alignment') as FitAssessmentData['arc_alignment'],
+    key_factors: get('key_factors'),
+    hard_req_status: get('hard_req_status'),
+  }
+}
+
 const initialState: ClientState = {
   sessionId: null,
   currentStep: null,
@@ -119,6 +140,19 @@ export function applyStepComplete(state: ClientState, step: CurrentStep, data?: 
 }
 
 function toMsg(m: StoredMessage): ChatMessage {
+  if (m.role === 'assistant') {
+    const parsed = parseVerdictFromText(m.content)
+    if (parsed) {
+      return {
+        id: crypto.randomUUID(),
+        role: m.role,
+        content: m.content,
+        type: 'fit_assessment_card',
+        data: { ...parsed, full_text: m.content } satisfies FitAssessmentData,
+        timestamp: new Date(m.created_at).getTime(),
+      }
+    }
+  }
   return {
     id: crypto.randomUUID(),
     role: m.role,
@@ -282,7 +316,14 @@ export function useSession() {
   }, [])
 
   const editBullet = useCallback((bulletId: string, text: string) => {
-    setState(prev => ({ ...prev, bulletEdits: { ...prev.bulletEdits, [bulletId]: text } }))
+    setState(prev => {
+      const wasUnreviewed = prev.bulletReviews[bulletId] === undefined && !prev.bulletEdits[bulletId]
+      return {
+        ...prev,
+        bulletEdits: { ...prev.bulletEdits, [bulletId]: text },
+        unreviewedCount: wasUnreviewed ? Math.max(0, prev.unreviewedCount - 1) : prev.unreviewedCount,
+      }
+    })
   }, [])
 
   const submitQuantifications = useCallback((answers: string[]) => {

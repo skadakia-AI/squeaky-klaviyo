@@ -98,10 +98,11 @@ export async function runResumeTargetingTurn2(
   const system = `${skillText}
 
 ---
-TURN 2 INSTRUCTION: Execute Steps 4, 5, and 6.
+TURN 2 INSTRUCTION: Execute Steps 4, 5, and 6 internally, then output ONLY the final JSON.
 - Use the conversation history and any numbers the user provided
 - Rewrite all bullets in scope, flag removals, run credibility check
-- Output the JSON format exactly as specified in the Output format section`
+- Do NOT print ORIGINAL/REWRITTEN/CHANGES blocks, RECOMMEND CUTTING prose, or credibility check findings — do all of this internally
+- Your ENTIRE response must be a single JSON code block (no preamble, no trailing commentary) in the format specified in the Output format section`
 
   let turn2Text: string
   try {
@@ -120,6 +121,7 @@ TURN 2 INSTRUCTION: Execute Steps 4, 5, and 6.
 
   const jsonMatch = turn2Text.match(/```json\n([\s\S]+?)\n```/) ?? turn2Text.match(/(\{[\s\S]+\})/)
   if (!jsonMatch) {
+    console.error('[resume-targeting] Turn 2 parse failed. Raw response:', turn2Text)
     return { success: false, code: 'PARSE_ERROR', message: 'Couldn\'t parse targeting output. Please try again.' }
   }
 

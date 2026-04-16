@@ -4,6 +4,7 @@ import ProgressUpdate from './ProgressUpdate'
 import ErrorMessage from './ErrorMessage'
 import JDDecodeCard from '../cards/JDDecodeCard'
 import FitAssessmentCard from '../cards/FitAssessmentCard'
+import { parseVerdictFromText } from '../../lib/session'
 import type { ChatMessage, FitAssessmentData } from '../../lib/types'
 
 interface MessageListProps {
@@ -52,7 +53,23 @@ export default function MessageList({
               />
             )
 
-          default:
+          default: {
+            // During streaming, if the verdict block has already arrived,
+            // render the card live so the layout appears as tokens stream in.
+            if (isLast && isStreaming && msg.role === 'assistant') {
+              const liveData = parseVerdictFromText(msg.content)
+              if (liveData) {
+                return (
+                  <FitAssessmentCard
+                    key={msg.id}
+                    data={{ ...liveData, full_text: msg.content }}
+                    content={msg.content}
+                    onChoice={(value, display) => onCheckpointChoice(value, display)}
+                    disabled={true}
+                  />
+                )
+              }
+            }
             return (
               <AssistantMessage
                 key={msg.id}
@@ -60,6 +77,7 @@ export default function MessageList({
                 isStreaming={isStreaming && isLast}
               />
             )
+          }
         }
       })}
 

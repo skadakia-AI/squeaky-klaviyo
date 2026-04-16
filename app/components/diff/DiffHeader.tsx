@@ -15,10 +15,11 @@ export default function DiffHeader({ unreviewedCount, isStreaming, onDownload }:
         flexShrink: 0,
       }}
     >
+      <span className="text-sm font-semibold" style={{ color: '#111827' }}>
+        Resume Targeting
+      </span>
+
       <div className="flex items-center gap-3">
-        <span className="text-sm font-semibold" style={{ color: '#111827' }}>
-          Resume Targeting
-        </span>
         {unreviewedCount > 0 && (
           <span className="text-xs px-2 py-0.5 rounded-full" style={{ backgroundColor: '#FEF3C7', color: '#92400E' }}>
             {unreviewedCount} left to review
@@ -26,23 +27,25 @@ export default function DiffHeader({ unreviewedCount, isStreaming, onDownload }:
         )}
         {unreviewedCount === 0 && (
           <span className="text-xs" style={{ color: '#6B7280' }}>
-            All bullets reviewed
+            All reviewed
           </span>
         )}
-      </div>
 
-      <button
-        onClick={onDownload}
-        disabled={isStreaming}
-        className="px-4 py-2 text-sm font-medium rounded"
-        style={{
-          backgroundColor: isStreaming ? '#E5E7EB' : '#111827',
-          color: isStreaming ? '#9CA3AF' : '#FFFFFF',
-          borderRadius: 6,
-        }}
-      >
-        Download .docx
-      </button>
+        <button
+          onClick={onDownload}
+          disabled={isStreaming || unreviewedCount > 0}
+          title={unreviewedCount > 0 ? 'Review all bullets before downloading' : undefined}
+          className="px-4 py-2 text-sm font-medium rounded"
+          style={{
+            backgroundColor: isStreaming || unreviewedCount > 0 ? '#E5E7EB' : '#111827',
+            color: isStreaming || unreviewedCount > 0 ? '#9CA3AF' : '#FFFFFF',
+            borderRadius: 6,
+            cursor: unreviewedCount > 0 ? 'not-allowed' : undefined,
+          }}
+        >
+          Download .docx
+        </button>
+      </div>
     </div>
   )
 }
