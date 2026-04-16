@@ -90,7 +90,7 @@ Each runner in `app/lib/skills/` is responsible for:
 **Skill context inputs** (what each runner reads from storage):
 - `jd-decoder.ts` — reads `raw_jd.md`
 - `jd-match.ts` — reads `decoded_jd.md`, `resume_structured.json`
-- `resume-targeting.ts` — reads `decoded_jd.md`, `resume_structured.json`
+- `resume-targeting.ts` — reads `decoded_jd.md`, `resume_structured.json`, `fit_assessment.md` (graceful fallback if missing)
 
 ---
 

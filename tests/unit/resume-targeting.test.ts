@@ -134,6 +134,38 @@ describe('runResumeTargetingTurn1', () => {
     expect(result.success).toBe(true)
     if (result.success) expect(result.needsNumbers).toBe(false)
   })
+
+  it('includes fit_assessment in user message when available', async () => {
+    const fitAssessmentContent = '## Verdict\nverdict: stretch but doable\n\n## What Narrative Work Needs to Accomplish\nBridge the gap in domain depth.'
+    vi.mocked(readFile)
+      .mockResolvedValueOnce('decoded jd content')
+      .mockResolvedValueOnce('{"name":"Test","experience":[],"education":[]}')
+      .mockResolvedValueOnce(fitAssessmentContent)
+    vi.mocked(anthropic.messages.stream).mockReturnValue(makeStream("No numbers needed — I'll start rewriting.") as never)
+
+    await runResumeTargetingTurn1(SESSION_ID, USER_ID, ['r0'], vi.fn())
+
+    const call = vi.mocked(anthropic.messages.stream).mock.calls[0][0]
+    const userContent = (call.messages[0] as { content: string }).content
+    expect(userContent).toContain('fit_assessment:')
+    expect(userContent).toContain('stretch but doable')
+    expect(userContent).toContain('Bridge the gap in domain depth')
+  })
+
+  it('proceeds without fit_assessment when it cannot be read', async () => {
+    vi.mocked(readFile)
+      .mockResolvedValueOnce('decoded jd content')
+      .mockResolvedValueOnce('{"name":"Test","experience":[],"education":[]}')
+      .mockRejectedValueOnce(new Error('storage: object not found'))
+    vi.mocked(anthropic.messages.stream).mockReturnValue(makeStream("No numbers needed — I'll start rewriting.") as never)
+
+    const result = await runResumeTargetingTurn1(SESSION_ID, USER_ID, ['r0'], vi.fn())
+
+    expect(result.success).toBe(true)
+    const call = vi.mocked(anthropic.messages.stream).mock.calls[0][0]
+    const userContent = (call.messages[0] as { content: string }).content
+    expect(userContent).not.toContain('fit_assessment:')
+  })
 })
 
 describe('runResumeTargetingTurn2', () => {

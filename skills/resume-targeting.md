@@ -6,6 +6,7 @@ Provided by the orchestrator:
 - `decoded_jd` — full decoded JD analysis (sections 1, 3, 10, 11)
 - `resume` — structured Resume JSON with bullet IDs
 - `scope` — list of role IDs confirmed for rewriting (set at checkpoint 2)
+- `fit_assessment` — candidate-specific fit assessment from the jd-match step: verdict, hard requirements status (Met / Partial / Not Met), career narrative fit, and gap analysis. Present when available; absent for older sessions.
 - `session_id` — current session identifier
 - `user_id` — authenticated user
 
@@ -68,14 +69,24 @@ Cut every element that does not serve the decision maker: bullets irrelevant to 
 
 ---
 
-## Step 1 — Build the strategic objectives map
+## Step 1 — Build the strategic objectives map and gap brief
 
+### Part A — Objectives map
 Before touching any bullet, build an internal map. For each business objective in Section 3 of the decoded JD:
 - State the objective in plain language
 - Identify which roles in `scope` are most relevant
 - Note what the no-brainer hire signal from Section 11 looks like for this objective
 
-Do not print this map — use it internally to drive all rewriting decisions.
+### Part B — Gap brief from fit assessment
+If `fit_assessment` is present, extract:
+- The verdict (`no-brainer` / `stretch but doable`) — this determines the session's framing
+- For **stretch** verdicts: the `## What Narrative Work Needs to Accomplish` section — this is your **primary targeting brief**. The bullets you rewrite must close these named gaps where raw material exists in the resume.
+- For **no-brainer** verdicts: the signals listed as `Present` in `## Career Narrative Fit` — amplify and lead with these throughout.
+- Any hard requirements with status `Partial` — these are the highest-priority gaps to address with evidence-forward rewrites.
+
+Use the fit assessment's gap analysis as authoritative — do not re-derive the candidate's gap profile from the decoded JD independently.
+
+Do not print either map — use both internally to drive all rewriting decisions.
 
 ---
 
@@ -134,7 +145,7 @@ Do not cut automatically. The user decides in the diff view.
 
 Before finalizing, check the full set of rewritten bullets as a whole:
 
-**Throughline:** does the arc across all rewritten bullets map to the no-brainer hire profile in Section 11? If not, identify what's missing.
+**Throughline:** For stretch verdicts, check that the rewritten bullets collectively address the gaps named in the fit assessment's `## What Narrative Work Needs to Accomplish` section. For no-brainer verdicts, check that the strongest `Present` career narrative signals lead the arc. If either is off, identify what's missing.
 
 **Credibility killer sweep:** one final pass for Principle 8 violations.
 

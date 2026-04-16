@@ -46,18 +46,25 @@ export async function runResumeTargetingTurn1(
     return { success: false, code: 'STORAGE_ERROR', message: 'Couldn\'t load required context. Please start a new session.' }
   }
 
+  let fitAssessment = ''
+  try {
+    fitAssessment = await readFile(userId, sessionId, 'fit_assessment.md')
+  } catch {
+    console.error('[resume-targeting] fit_assessment.md not found — proceeding without it, session:', sessionId)
+  }
+
   const skillText = fs.readFileSync(path.join(process.cwd(), 'skills', 'resume-targeting.md'), 'utf-8')
   const system = `${skillText}
 
 ---
 TURN 1 INSTRUCTION: Execute Steps 1, 2, and 3 ONLY.
-- Build the strategic objectives map internally (do not print)
+- Build the strategic objectives map and gap brief internally (do not print)
 - Audit all bullets in scope silently (do not print)
 - If any bullets need quantification, print the numbers request (Step 3 format) and STOP
 - If no numbers are needed, print exactly: "No numbers needed — I'll start rewriting." and STOP
 - DO NOT proceed to Steps 4, 5, or 6. No ORIGINAL/REWRITTEN blocks, no JSON output.
 - NEVER print bullet IDs (e.g. r0-b0, r1-b2) in any output. Reference bullets by their text only.`
-  const userMsg = `decoded_jd: ${decodedJD}\nresume: ${resumeStructured}\nscope: ${JSON.stringify(scopeIds)}\nsession_id: ${sessionId}\nuser_id: ${userId}`
+  const userMsg = `decoded_jd: ${decodedJD}\nresume: ${resumeStructured}${fitAssessment ? `\nfit_assessment: ${fitAssessment}` : ''}\nscope: ${JSON.stringify(scopeIds)}\nsession_id: ${sessionId}\nuser_id: ${userId}`
 
   let turn1Text = ''
   try {
