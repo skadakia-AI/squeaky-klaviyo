@@ -3,9 +3,6 @@
 ## In Progress / Next Up
 
 ### UX Polish
-- [ ] **Fit assessment verdict display** — verdict banner looks machine-esque; needs visual cleanup (easy, UI-only)
-- [ ] **QuantificationPanel design** — apply FitAssessmentCard card aesthetic (card shell, color scheme, typography). Functional flow is correct; visual-only pass. Light lift.
-- [ ] **Diff view design** — apply FitAssessmentCard aesthetic to DiffViewPanel and BulletRow. Functional already (accept/reject/inline edit all work); purely visual. Medium lift.
 - [ ] **User navigation** — navigating between stages of the flow (dashboard → active session → step progress) and revisiting earlier outputs (decoded JD, fit assessment) without losing state. Requires workspace design decision first.
 - [ ] **Workspace design** — define what the user's workspace should look and feel like: navigation, save/revisit JD decode and fit assessment, overall information architecture. *Scope this before building.*
 - [ ] **App landing page & onboarding** — app entry point for new users: value prop, sign-in/up, empty state, first-use guidance. Distinct from the marketing landing page.
@@ -35,7 +32,7 @@
 - [ ] **Reminder bubble UX** — `handleChat` appends a separate reminder bubble after streamed response. Consider folding into streamed reply instead.
 
 ### Infrastructure
-- [ ] Rename `middleware.ts` → `proxy.ts` (Next.js 16 deprecation warning)
+- [x] Rename `middleware.ts` → `proxy.ts` (Next.js 16 deprecation warning)
 
 ---
 
@@ -80,3 +77,6 @@
 - [x] Resume targeting Turn 1/2 split — bullet IDs no longer appear in streamed output
 - [x] Numbers loop fix — bypass classifier in numbers sub-state; robust needsNumbers detection
 - [x] Test isolation fix — fetchMessages reset in beforeEach
+- [x] Fit assessment verdict display — colored banner, key factors, arc alignment row, narrative with color-coded status dots
+- [x] QuantificationPanel design — card shell, uppercase column headers, matching DiffHeader aesthetic
+- [x] Diff view design — DiffHeader card style, BulletRow color-coded rows, consistent typography
