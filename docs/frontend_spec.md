@@ -1,8 +1,6 @@
 # Squeaky — Frontend Spec
 **Last updated: April 2026**
 
-> **Note: Diff view section is partially stale as of April 2026.** The download button is now gated on `unreviewedCount === 0` (not always enabled). Accept/reject uses two buttons (not a cycle toggle). Removal rows use X=remove / ✓=keep semantics. Out-of-scope roles have a per-role "Exclude bullets from resume" toggle rather than a shared divider. `unreviewedCount` includes both rewrites and flagged-for-removal bullets.
-
 ---
 
 ## Design Principles
@@ -34,9 +32,8 @@
 | `verdict-green` | `#DCFCE7` / `#16A34A` | No-brainer badge bg / text |
 | `verdict-amber` | `#FEF9C3` / `#CA8A04` | Stretch but doable badge bg / text |
 | `verdict-red` | `#FEE2E2` / `#DC2626` | Not a fit badge bg / text |
-| `diff-accepted` | `#F0FDF4` | Rewritten bullet bg when accepted |
-| `diff-rejected` | `#F9FAFB` | Rewritten bullet bg when rejected |
-| `diff-edited` | `#EFF6FF` | Rewritten bullet bg when user has edited it |
+| `diff-accepted` | `#F0FDF4` | Rewrite bullet bg when accepted; removal bullet bg when kept |
+| `diff-rejected` | `#FEF2F2` | Rewrite bullet bg when rejected; removal bullet bg when marked for removal |
 | `unquantified` | `#FEF9C3` / `#CA8A04` | Missing number badge bg / text |
 | `error` | `#FEF2F2` / `#DC2626` | Error message bg / text |
 
@@ -202,129 +199,127 @@ On click: brief loading state (spinner in button), input remains hidden while or
 
 ## Diff View Panel
 
-Full-viewport overlay. Appears when `step_complete: targeted` SSE event fires. Slides up from bottom over 200ms (ease-out). Chat remains mounted behind it.
+Full-viewport overlay. Appears when `step_complete: targeted` SSE event fires. Chat remains mounted behind it.
 
-### Diff Header (48px, fixed within panel)
+### Diff Header (56px, fixed within panel)
 
 ```
-← Back to chat    Reviewing: Lead PM @ State Street    3 of 15 unreviewed    [ Download .docx → ]
+Resume Targeting                  [ 5 left to review ]    [ Download .docx → ]
 ```
 
-- **← Back to chat:** text link, left. Closes panel without discarding reviews.
-- **Role name:** centered, 14px semi-bold.
-- **Unreviewed count:** `text-muted`, 13px. Live count. Shows *"All reviewed"* when done.
-- **Download .docx:** primary button, always enabled. If unreviewed bullets remain, shows tooltip: *"3 unreviewed bullets will use original text."* On click: submits `bullet_reviews` + `bullet_edits` to `/api/session/reviews`, triggers export-resume, initiates file download.
+- **Title:** "Resume Targeting" — 13px semi-bold, left.
+- **Unreviewed count:** amber pill badge (`#FEF3C7` / `#92400E`), 12px. Live count. Shows *"All reviewed"* in muted text when zero.
+- **Download .docx:** primary button (`#111827` bg, white text). **Disabled** until `unreviewedCount === 0`. On click: submits `bullet_reviews`, `bullet_edits`, and `excluded_out_of_scope_roles` to `/api/session/reviews`, triggers export-resume, initiates file download.
+
+`unreviewedCount` is initialized as the total number of rewrite bullets plus flagged-for-removal bullets across all in-scope roles. Every bullet with a rewrite or removal recommendation requires an explicit decision before download unlocks.
 
 ### Diff Body (scrollable)
 
-**Column headers (top of body, not sticky):**
-```
-  ORIGINAL TEXT                  YOUR VERSION
-```
-12px, `text-muted`, uppercase.
-
-Organized by role. In-scope roles first, out-of-scope roles appended after with a visual divider.
-
-**Role header (sticky per role):**
-```
-TANGIFY — FOUNDER & CEO  ·  2021–2025
-```
-13px semi-bold, all-caps, `text-muted`. Thin bottom border. Sticks to top of panel body while scrolling through that role.
+Background `#F9FAFB`. Max width 900px, centered. Roles rendered as cards, each with its own border and header strip.
 
 ---
 
-### Bullet Row — In Scope
+### Role Card Structure
 
+Each role renders as a card (`border: 1px solid #E5E7EB`, `border-radius: 8px`, `overflow: hidden`).
+
+**Role header strip** (top of card, `#F9FAFB` bg, bottom border):
 ```
-┌──────────────────────────────┬──────────────────────────────┬──────┐
-│ ORIGINAL                     │ YOUR VERSION                 │  ○   │
-│                              │                              │      │
-│ Built live MVP within weeks  │ Compressed concept-to-       │      │
-│ using no-/low-code tools;    │ paying-customer cycle to     │      │
-│ recruited 100+ users and     │ under 8 weeks by building a  │      │
-│ converted first paying       │ live MVP, recruiting 100+    │      │
-│ customers within weeks       │ users, and running structured│      │
-│                              │ feedback loops               │      │
-│                              │                              │      │
-│                              │ → Establish scalable         │      │
-│                              │   operating models           │      │
-└──────────────────────────────┴──────────────────────────────┴──────┘
+Senior Product Manager   Tangify · 2021–2025
 ```
+13px semi-bold title, 12px muted company + dates. For out-of-scope roles, see Out-of-Scope section below.
 
-- **Left column (44%):** original text. `text-muted`, 13px. Read-only.
-- **Right column (50%):** rewritten text (or user-edited text). `text-primary`, 13px.
-- **Objective tag (below rewritten text):** `→ [objective]` — 12px, `text-muted`, italic. Always visible.
-- **Toggle (6%):** circular, three-state (see below).
-
-**Toggle states:**
-- **Unreviewed (○):** grey ring. No background change on right column.
-- **Accepted (✓):** green icon. Right column bg → `diff-accepted`. If user has edited: bg → `diff-edited`.
-- **Rejected (✗):** grey ✗. Right column bg → `diff-rejected`, text muted. Left column gets faint highlight border.
-
-Click cycles: unreviewed → accepted → rejected → unreviewed.
+**Column headers** (white bg, bottom border, below role header — in-scope roles only):
+```
+  ORIGINAL                       REWRITTEN
+```
+11px, `#9CA3AF`, uppercase, letter-spaced.
 
 ---
 
-### Unquantified Bullet
-
-When `unquantified: true`, the bullet row shows an amber badge above the rewritten column:
+### Bullet Row — Rewrite
 
 ```
-                              │ ⚠ missing number             │
-                              │                              │
-                              │ Directed €300M+ in active    │
-                              │ investments...               │
+┌──────────────────────────┬────────────────────────────────┬──────┐
+│ Built live MVP within    │ Compressed concept-to-paying-  │ ✓ ✕ │
+│ weeks using no-/low-code │ customer cycle to under 8 weeks│      │
+│ tools; recruited 100+    │ by building a live MVP,        │      │
+│ users...                 │ recruiting 100+ users, and     │      │
+│                          │ running structured feedback    │  ✎   │
+│                          │ → Establish scalable models    │      │
+└──────────────────────────┴────────────────────────────────┴──────┘
 ```
 
-`⚠ missing number` — 11px, `unquantified` colors. Acts as a visual prompt to click and edit.
+- **Left column:** original text. 13px, `#6B7280`. Read-only.
+- **Right column:** rewritten (or edited) text. 13px, `#111827`. Objective tag below in blue (`#EFF6FF` / `#1D4ED8`).
+- **Controls (bottom-right of right column):**
+  - **✎ edit button** (pencil icon, 28×28, `#F3F4F6` bg) — opens textarea for inline editing
+  - **✓ accept** and **✕ reject** buttons (28×28 each)
+
+**Row background by state:**
+- Unreviewed: `#FFFFFF`
+- Accepted: `#F0FDF4` (light green)
+- Rejected: `#FEF2F2` (light red)
 
 ---
 
 ### Inline Editing
 
-**Any bullet's right column is editable.** Click anywhere on the rewritten text → the column becomes an inline textarea (auto-height, same font). No explicit "edit mode" toggle.
+Clicking the ✎ button (or anywhere on the rewritten text) opens an inline textarea. On blur the textarea closes and the edit is saved.
 
-While editing:
-- Border appears on right column (`border` color, 1px)
-- Small `edited` badge appears in bottom-right corner of the cell (12px, `text-muted`)
-- Toggle automatically moves to accepted state
+**Editing auto-accepts the bullet** — `bulletReviews[id]` is set to `true` and the row turns green. The user can still explicitly reject after editing; rejection always exports the original text regardless of any edit.
 
-On blur:
-- Textarea returns to display mode
-- `edited` badge persists
-- Unreviewed count updates if this was the first interaction
-
-**Edit persistence:** edits stored in `bulletEdits` in client state (`Record<string, string>`) and submitted with `bullet_reviews` on download.
-
-**For `⚠ missing number` bullets:** clicking the badge focuses the textarea immediately.
+**Edit persistence:** stored in `bulletEdits` (`Record<string, string>`). Resolution order at export time: rejected → original; edit present → edited text; accepted → AI rewrite; else → original.
 
 ---
 
-### Flagged for Removal Row
+### Unquantified Bullet
 
-Right column shows in italic `text-muted`: *"Remove this bullet"*
-Below that, smaller `text-muted`: *"[reason from targeting output]"*
-
-Toggle semantics for removal rows:
-- **Accepted (✓)** = remove from export
-- **Rejected (✗)** = keep original bullet in export
-
-Visual: when accepted (remove), a faint strikethrough line spans the full row width.
+When `unquantified: true`, an amber `+ number?` badge appears below the objective tag. Acts as a prompt to click edit and add a figure.
 
 ---
 
-### Out-of-Scope Bullets
+### Bullet Row — Flagged for Removal
 
-Appear after all in-scope bullets, separated by a thin divider and label: `NOT IN SCOPE — EXPORTED UNCHANGED`.
-
+Right column shows:
 ```
-┌──────────────────────────────┬──────────────────────────────┬──────────┐
-│ Expanded coverage into power │ Expanded coverage into power │ UNCHANGED│
-│ and renewables...            │ and renewables...            │          │
-└──────────────────────────────┴──────────────────────────────┴──────────┘
+Flagged for removal
+[reason text — why this bullet was flagged]
 ```
+Both lines in `#9CA3AF`, italic. No edit button.
 
-Both columns `text-muted`. No toggle. `UNCHANGED` label in `text-placeholder`, 11px, right-aligned.
+**Button semantics (inverted from rewrite rows):**
+- **✕ (left button)** = remove from export. Active state: red (`#991B1B` bg).
+- **✓ (right button)** = keep bullet in export. Active state: green (`#065F46` bg).
+
+**Row background by state:**
+- Unreviewed: `#FFFFFF`
+- Removal accepted (✕): `#FEF2F2` (light red — signals deletion)
+- Removal rejected / kept (✓): `#F0FDF4` (light green — signals retained)
+
+---
+
+### Out-of-Scope Roles
+
+Out-of-scope roles appear in the same card structure as in-scope roles. Their bullets are shown dimmed (`#9CA3AF`) with no rewrite or accept/reject controls. The role header strip carries an "Exclude bullets from resume" toggle button.
+
+**Default state (bullets included in export):**
+```
+Senior PM   Acme Corp · 2018–2020   [ Exclude bullets from resume ]
+```
+- Bullets visible below, dimmed
+- All bullets export unchanged
+
+**After toggling exclusion:**
+```
+Senior PM   Acme Corp · 2018–2020   [ Bullets excluded from resume ]
+```
+- Bullets disappear from the diff view
+- Role still exports (company, title, dates) — bullets are stripped from the docx
+- Toggle button styled with red tint (`#FEF2F2` bg, `#991B1B` text, red border) to signal active exclusion
+- Toggle is reversible at any time before download
+
+`excludedOutOfScopeRoles` (array of role IDs) is submitted with `bullet_reviews` and `bullet_edits` on download and saved to the session. The default is an empty array — no exclusions unless the user opts out.
 
 ---
 
@@ -359,9 +354,10 @@ type ClientState = {
   showDiffView: boolean
   targetingData: TargetingOutput | null
   resumeData: Resume | null
-  bulletReviews: Record<string, boolean>    // bullet_id: accepted
-  bulletEdits: Record<string, string>       // bullet_id: edited text
-  unreviewedCount: number
+  bulletReviews: Record<string, boolean>    // bullet_id → true=accept/remove, false=reject/keep
+  bulletEdits: Record<string, string>       // bullet_id → edited text (edit auto-accepts)
+  unreviewedCount: number                   // rewrites + removals requiring a decision; gates download
+  excludedOutOfScopeRoles: string[]         // role IDs whose bullets are stripped from the export
   error: { code: string; message: string } | null
 }
 
@@ -412,11 +408,11 @@ components/
     DiffHeader.tsx            — back link, role name, unreviewed count, download
     DiffBody.tsx              — scrollable, organizes RoleSections
     RoleSection.tsx           — sticky role header + bullet rows
-    BulletRow.tsx             — original | rewritten | toggle (in-scope)
-    OutOfScopeBullet.tsx      — greyed-out unchanged rows
-    AcceptRejectToggle.tsx    — three-state circular toggle (○ / ✓ / ✗)
+    BulletRow.tsx             — original | rewritten | ✎ edit button | ✓ ✕ accept/reject (in-scope); X ✓ remove/keep (removal)
+    OutOfScopeBullet.tsx      — dimmed read-only bullet row for out-of-scope and pass-through bullets
+    AcceptRejectToggle.tsx    — two-button ✓ / ✕; variant='removal' inverts icons and active colors
     ObjectiveTag.tsx          — → [objective] label under rewritten text
-    UnquantifiedBadge.tsx     — ⚠ missing number amber badge
+    UnquantifiedBadge.tsx     — + number? amber badge
 
 lib/
   session.ts                  — useSession hook, ClientState management
