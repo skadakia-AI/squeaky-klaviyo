@@ -16,6 +16,23 @@ type LoadResumeResult =
   | { success: true; rawText: string; resume: Resume; short: boolean }
   | { success: false; error: string; message: string }
 
+async function isResume(text: string): Promise<boolean> {
+  try {
+    const response = await anthropic.messages.create({
+      model: MODELS.parsing,
+      max_tokens: 5,
+      messages: [{
+        role: 'user',
+        content: `Is the following text a resume or CV listing someone's work experience? Answer only YES or NO. If uncertain, answer YES.\n\n${text.slice(0, 3000)}`,
+      }],
+    })
+    const answer = response.content[0].type === 'text' ? response.content[0].text.trim().toUpperCase() : 'YES'
+    return !answer.startsWith('NO')
+  } catch {
+    return true // fail open — don't block valid users on API errors
+  }
+}
+
 export async function loadResume(input: LoadResumeInput): Promise<LoadResumeResult> {
   let rawText = ''
 
@@ -50,6 +67,11 @@ export async function loadResume(input: LoadResumeInput): Promise<LoadResumeResu
 
   const lineCount = rawText.split('\n').filter(l => l.trim()).length
   const short = lineCount < 20
+
+  const resumeCheck = await isResume(rawText)
+  if (!resumeCheck) {
+    return { success: false, error: 'NOT_A_RESUME', message: "That doesn't look like a resume. Try uploading your resume PDF, Word document, or pasting it as text." }
+  }
 
   // ── 2. Call Haiku for structured extraction ──────────────────────────────
   const extractionPrompt = `Extract the following resume text into a structured JSON object matching this TypeScript schema exactly:

@@ -161,6 +161,11 @@ async function handleResumeUpload(
     return
   }
 
+  if (resumeResult.resume.experience.length === 0) {
+    emit({ type: 'error', code: 'NOT_A_RESUME', message: "Couldn't find any work experience in that document. Make sure you're uploading your resume, or try pasting it as plain text." })
+    return
+  }
+
   if (resumeResult.short) {
     const lineCount = resumeResult.rawText.split('\n').filter((l: string) => l.trim()).length
     emit({ type: 'message', role: 'assistant', content: `This looks shorter than a typical resume (${lineCount} lines). Continuing — let me know if something looks off.` })

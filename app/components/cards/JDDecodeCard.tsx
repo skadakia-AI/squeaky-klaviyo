@@ -2,9 +2,10 @@ import ReactMarkdown from 'react-markdown'
 
 interface JDDecodeCardProps {
   content: string
+  showUploadPrompt: boolean
 }
 
-export default function JDDecodeCard({ content }: JDDecodeCardProps) {
+export default function JDDecodeCard({ content, showUploadPrompt }: JDDecodeCardProps) {
   return (
     <div
       className="rounded-lg overflow-hidden"
@@ -65,12 +66,14 @@ export default function JDDecodeCard({ content }: JDDecodeCardProps) {
         </ReactMarkdown>
       </div>
 
-      <div
-        className="px-4 py-3 text-sm"
-        style={{ borderTop: '1px solid #E5E7EB', backgroundColor: '#F9FAFB', color: '#6B7280' }}
-      >
-        Upload your resume or paste it below.
-      </div>
+      {showUploadPrompt && (
+        <div
+          className="px-4 py-3 text-sm"
+          style={{ borderTop: '1px solid #E5E7EB', backgroundColor: '#F9FAFB', color: '#6B7280' }}
+        >
+          Upload your resume or paste it below.
+        </div>
+      )}
     </div>
   )
 }

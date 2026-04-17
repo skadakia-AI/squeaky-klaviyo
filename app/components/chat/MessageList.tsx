@@ -5,11 +5,12 @@ import ErrorMessage from './ErrorMessage'
 import JDDecodeCard from '../cards/JDDecodeCard'
 import FitAssessmentCard from '../cards/FitAssessmentCard'
 import { parseVerdictFromText } from '../../lib/session'
-import type { ChatMessage, FitAssessmentData } from '../../lib/types'
+import type { ChatMessage, FitAssessmentData, CurrentStep } from '../../lib/types'
 
 interface MessageListProps {
   messages: ChatMessage[]
   isStreaming: boolean
+  currentStep: CurrentStep | null
   bulletReviews: Record<string, boolean>
   bulletEdits: Record<string, string>
   onAccept: (bulletId: string) => void
@@ -21,6 +22,7 @@ interface MessageListProps {
 export default function MessageList({
   messages,
   isStreaming,
+  currentStep,
   onCheckpointChoice,
 }: MessageListProps) {
   return (
@@ -40,7 +42,7 @@ export default function MessageList({
             return <ErrorMessage key={msg.id} content={msg.content} />
 
           case 'jd_decode_card':
-            return <JDDecodeCard key={msg.id} content={msg.content} />
+            return <JDDecodeCard key={msg.id} content={msg.content} showUploadPrompt={currentStep === 'decoded'} />
 
           case 'fit_assessment_card':
             return (

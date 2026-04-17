@@ -128,7 +128,7 @@ beforeEach(() => {
 
 describe('created step', () => {
   it('calls loadJD with type text for plain text input', async () => {
-    vi.mocked(loadJD).mockResolvedValue({ success: true, rawText: 'Software Engineer at Acme...', sparse: false })
+    vi.mocked(loadJD).mockResolvedValue({ success: true, rawText: 'Software Engineer at Acme...' })
     vi.mocked(runJDDecoder).mockResolvedValue({ success: true, decodedText: '# JD Decoded', roleTitle: 'SWE', company: 'Acme', slug: 'acme-swe' })
 
     await run({ type: 'text', content: 'Software Engineer at Acme Corp...' }, makeSession())
@@ -139,7 +139,7 @@ describe('created step', () => {
   })
 
   it('calls loadJD with type url when content starts with http', async () => {
-    vi.mocked(loadJD).mockResolvedValue({ success: true, rawText: 'Senior Engineer...', sparse: false })
+    vi.mocked(loadJD).mockResolvedValue({ success: true, rawText: 'Senior Engineer...' })
     vi.mocked(runJDDecoder).mockResolvedValue({ success: true, decodedText: '# JD Decoded', roleTitle: 'SWE', company: 'Acme', slug: 'acme-swe' })
 
     await run({ type: 'text', content: 'https://jobs.acme.com/swe' }, makeSession())
@@ -150,7 +150,7 @@ describe('created step', () => {
   })
 
   it('calls loadJD with type pdf for file_upload', async () => {
-    vi.mocked(loadJD).mockResolvedValue({ success: true, rawText: 'Senior Engineer...', sparse: false })
+    vi.mocked(loadJD).mockResolvedValue({ success: true, rawText: 'Senior Engineer...' })
     vi.mocked(runJDDecoder).mockResolvedValue({ success: true, decodedText: '# JD Decoded', roleTitle: 'SWE', company: 'Acme', slug: 'acme-swe' })
 
     await run({ type: 'file_upload', content: 'base64data==', file_type: 'pdf' }, makeSession())
@@ -161,7 +161,7 @@ describe('created step', () => {
   })
 
   it('advances directly to decoded without stopping at jd_loaded', async () => {
-    vi.mocked(loadJD).mockResolvedValue({ success: true, rawText: 'Software Engineer...', sparse: false })
+    vi.mocked(loadJD).mockResolvedValue({ success: true, rawText: 'Software Engineer...' })
     vi.mocked(runJDDecoder).mockResolvedValue({ success: true, decodedText: '# JD Decoded', roleTitle: 'SWE', company: 'Acme', slug: 'acme-swe' })
 
     const events = await run({ type: 'text', content: 'some jd text' }, makeSession())
@@ -174,7 +174,7 @@ describe('created step', () => {
   })
 
   it('does not emit a separate upload-resume message after decode — prompt is in the card footer', async () => {
-    vi.mocked(loadJD).mockResolvedValue({ success: true, rawText: 'Software Engineer...', sparse: false })
+    vi.mocked(loadJD).mockResolvedValue({ success: true, rawText: 'Software Engineer...' })
     vi.mocked(runJDDecoder).mockResolvedValue({ success: true, decodedText: '# JD Decoded', roleTitle: 'SWE', company: 'Acme', slug: 'acme-swe' })
 
     const events = await run({ type: 'text', content: 'some jd text' }, makeSession())
@@ -192,6 +192,18 @@ describe('created step', () => {
     expect(vi.mocked(updateSession)).not.toHaveBeenCalledWith(
       expect.anything(), expect.anything(), expect.objectContaining({ current_step: 'jd_loaded' })
     )
+  })
+
+  it('emits NOT_A_JD error and does not advance when loadJD rejects non-JD content', async () => {
+    vi.mocked(loadJD).mockResolvedValue({ success: false, error: 'NOT_A_JD', message: "That doesn't look like a job description." })
+
+    const events = await run({ type: 'text', content: 'Some company about page' }, makeSession())
+
+    const errorEvent = events.find(e => e.type === 'error') as Extract<OrchestratorEvent, { type: 'error' }> | undefined
+    expect(errorEvent).toBeDefined()
+    expect(errorEvent?.code).toBe('NOT_A_JD')
+    expect(vi.mocked(updateSession)).not.toHaveBeenCalled()
+    expect(vi.mocked(runJDDecoder)).not.toHaveBeenCalled()
   })
 })
 
@@ -243,7 +255,7 @@ describe('decoded step', () => {
   })
 
   it('emits error and does not advance on loadResume failure', async () => {
-    vi.mocked(loadResume).mockResolvedValue({ success: false, error: 'PARSE_FAILED', message: 'Could not read PDF' })
+    vi.mocked(loadResume).mockResolvedValue({ success: false, error: 'NOT_A_RESUME', message: "That doesn't look like a resume." })
 
     const events = await run(
       { type: 'file_upload', content: 'base64==', file_type: 'pdf' },
@@ -265,6 +277,22 @@ describe('decoded step', () => {
     )
 
     expect(events.some(e => e.type === 'error')).toBe(true)
+  })
+
+  it('emits NOT_A_RESUME error and does not advance when resume has no experience', async () => {
+    const emptyResume: Resume = { name: 'Test', experience: [], education: [] }
+    vi.mocked(loadResume).mockResolvedValue({ success: true, rawText: 'Some text', resume: emptyResume, short: true })
+
+    const events = await run(
+      { type: 'text', content: 'some non-resume text' },
+      makeSession({ current_step: 'decoded' })
+    )
+
+    const errorEvent = events.find(e => e.type === 'error') as Extract<OrchestratorEvent, { type: 'error' }> | undefined
+    expect(errorEvent).toBeDefined()
+    expect(errorEvent?.code).toBe('NOT_A_RESUME')
+    expect(vi.mocked(updateSession)).not.toHaveBeenCalled()
+    expect(vi.mocked(runJDMatchTurn1)).not.toHaveBeenCalled()
   })
 })
 
@@ -840,7 +868,7 @@ describe('chat bypass', () => {
   })
 
   it('skips classification for the created step', async () => {
-    vi.mocked(loadJD).mockResolvedValue({ success: true, rawText: 'Some JD...', sparse: false })
+    vi.mocked(loadJD).mockResolvedValue({ success: true, rawText: 'Some JD...' })
     vi.mocked(runJDDecoder).mockResolvedValue({ success: true, decodedText: '# JD', roleTitle: 'SWE', company: 'Acme', slug: 'acme-swe' })
 
     await run(

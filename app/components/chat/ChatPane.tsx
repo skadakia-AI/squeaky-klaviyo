@@ -110,6 +110,7 @@ export default function ChatPane({ session }: ChatPaneProps) {
           <MessageList
             messages={messages}
             isStreaming={isStreaming}
+            currentStep={currentStep}
             bulletReviews={bulletReviews}
             bulletEdits={bulletEdits}
             onAccept={acceptBullet}

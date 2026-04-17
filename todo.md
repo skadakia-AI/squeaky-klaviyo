@@ -34,6 +34,10 @@
 ### Infrastructure
 - [x] Rename `middleware.ts` → `proxy.ts` (Next.js 16 deprecation warning)
 
+### Tech Debt
+- [ ] **Delete `JDDecodeData` type** — defined in `types.ts` but never populated anywhere; JD decode renders as markdown, not structured sections. Remove type and its branch in `ChatMessage.data?`.
+- [ ] **Deduplicate verdict block parser** — `parseVerdictFromText` (`session.ts`) and `parseVerdictBlock` (`jd-match.ts`) implement the same regex-based field extraction. Extract to a shared utility importable by both client and server.
+
 ---
 
 ## Downstream (post-core)

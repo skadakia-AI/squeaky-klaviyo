@@ -236,8 +236,14 @@ export function useSession() {
         setState(prev => {
           const messages = [...prev.messages]
           if (prev.isStreaming) {
-            const last = messages[messages.length - 1]
-            if (last?.role === 'assistant' && last.type === 'text') messages.pop()
+            while (messages.length > 0) {
+              const last = messages[messages.length - 1]
+              if (last.role === 'assistant' && (last.type === 'progress' || last.type === 'text')) {
+                messages.pop()
+              } else {
+                break
+              }
+            }
           }
           messages.push({
             id: crypto.randomUUID(),
