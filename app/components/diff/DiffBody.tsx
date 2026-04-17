@@ -6,9 +6,11 @@ interface DiffBodyProps {
   resumeData: Resume | null
   bulletReviews: Record<string, boolean>
   bulletEdits: Record<string, string>
+  excludedOutOfScopeRoles: string[]
   onAccept: (bulletId: string) => void
   onReject: (bulletId: string) => void
   onEdit: (bulletId: string, text: string) => void
+  onToggleOutOfScopeRole: (roleId: string) => void
 }
 
 export default function DiffBody({
@@ -16,9 +18,11 @@ export default function DiffBody({
   resumeData,
   bulletReviews,
   bulletEdits,
+  excludedOutOfScopeRoles,
   onAccept,
   onReject,
   onEdit,
+  onToggleOutOfScopeRole,
 }: DiffBodyProps) {
   const scopeSet = new Set(targetingData.scope ?? [])
   const roles = resumeData?.experience ?? []
@@ -31,6 +35,7 @@ export default function DiffBody({
             key={role.id}
             role={role}
             inScope={scopeSet.has(role.id)}
+            bulletsExcluded={excludedOutOfScopeRoles.includes(role.id)}
             rewrites={targetingData.rewrites?.filter(r => r.bullet_id.startsWith(role.id)) ?? []}
             removals={targetingData.flagged_for_removal?.filter(r => r.bullet_id.startsWith(role.id)) ?? []}
             bulletReviews={bulletReviews}
@@ -38,6 +43,7 @@ export default function DiffBody({
             onAccept={onAccept}
             onReject={onReject}
             onEdit={onEdit}
+            onToggleExclude={() => onToggleOutOfScopeRole(role.id)}
           />
         ))}
 

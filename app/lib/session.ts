@@ -49,6 +49,7 @@ const initialState: ClientState = {
   bulletReviews: {},
   bulletEdits: {},
   unreviewedCount: 0,
+  excludedOutOfScopeRoles: [],
   quantificationQuestions: null,
   error: null,
 }
@@ -127,7 +128,7 @@ export function applyStepComplete(state: ClientState, step: CurrentStep, data?: 
         checkpoint: null,
         targetingData: d?.targeting ?? null,
         resumeData: d?.resume ?? null,
-        unreviewedCount: d?.targeting?.rewrites?.length ?? 0,
+        unreviewedCount: (d?.targeting?.rewrites?.length ?? 0) + (d?.targeting?.flagged_for_removal?.length ?? 0),
       }
     }
 
@@ -284,6 +285,7 @@ export function useSession() {
       messages: messages.map(toMsg),
       bulletReviews: session.bullet_reviews ?? {},
       bulletEdits: session.bullet_edits ?? {},
+      excludedOutOfScopeRoles: session.excluded_out_of_scope_roles ?? [],
     }))
     setPendingRecovery(null)
   }, [])
@@ -321,6 +323,7 @@ export function useSession() {
       return {
         ...prev,
         bulletEdits: { ...prev.bulletEdits, [bulletId]: text },
+        bulletReviews: { ...prev.bulletReviews, [bulletId]: true },
         unreviewedCount: wasUnreviewed ? Math.max(0, prev.unreviewedCount - 1) : prev.unreviewedCount,
       }
     })
@@ -337,11 +340,24 @@ export function useSession() {
     sendMessage({ type: 'text', content: text })
   }, [sendMessage])
 
+  const toggleOutOfScopeRole = useCallback((roleId: string) => {
+    setState(prev => {
+      const excluded = prev.excludedOutOfScopeRoles
+      const isExcluded = excluded.includes(roleId)
+      return {
+        ...prev,
+        excludedOutOfScopeRoles: isExcluded
+          ? excluded.filter(id => id !== roleId)
+          : [...excluded, roleId],
+      }
+    })
+  }, [])
+
   const downloadResume = useCallback(async () => {
-    const { sessionId, bulletReviews, bulletEdits } = stateRef.current
+    const { sessionId, bulletReviews, bulletEdits, excludedOutOfScopeRoles } = stateRef.current
     if (!sessionId) return
 
-    const result = await postReviews(sessionId, bulletReviews, bulletEdits)
+    const result = await postReviews(sessionId, bulletReviews, bulletEdits, excludedOutOfScopeRoles)
     if (!result.success) {
       setState(prev => ({ ...prev, error: { code: 'REVIEWS_FAILED', message: 'Failed to save your selections. Please try again.' } }))
       return
@@ -372,6 +388,7 @@ export function useSession() {
     bulletReviews: state.bulletReviews,
     bulletEdits: state.bulletEdits,
     unreviewedCount: state.unreviewedCount,
+    excludedOutOfScopeRoles: state.excludedOutOfScopeRoles,
     quantificationQuestions: state.quantificationQuestions,
     error: state.error,
     pendingRecovery,
@@ -381,6 +398,7 @@ export function useSession() {
     acceptBullet,
     rejectBullet,
     editBullet,
+    toggleOutOfScopeRole,
     submitQuantifications,
     downloadResume,
     clearCheckpoint,

@@ -66,6 +66,7 @@ Cut every element that does not serve the decision maker: bullets irrelevant to 
 - **Harmful numbers:** percentages without context, numbers that reveal small scale, numbers that date the experience poorly
 - **Title mismatches:** if the title is junior relative to the role, reframe around scope and impact — never draw attention to the mismatch
 - **Irrelevant skills:** remove any bullet signaling expertise the role doesn't need
+- **Target company references:** never name the target company, reference the job description, or use the specific role title in rewritten bullets. Bullets are about the candidate's genuine achievements — the hiring manager draws the connection themselves. Writing it in reads as AI-generated and presumptuous, not authentic.
 
 ---
 

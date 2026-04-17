@@ -2,7 +2,7 @@ import { vi, describe, it, expect } from 'vitest'
 
 vi.mock('../../app/lib/supabase', () => ({ getServiceClient: vi.fn() }))
 
-import { buildExportFilename } from '../../app/lib/utils/export-resume'
+import { buildExportFilename, resolveText } from '../../app/lib/utils/export-resume'
 
 describe('buildExportFilename', () => {
   it('builds initials_company_role format for a full set of inputs', () => {
@@ -49,5 +49,44 @@ describe('buildExportFilename', () => {
 
   it('handles single-word names gracefully', () => {
     expect(buildExportFilename('Madonna', 'Acme', 'Engineer')).toBe('M_Acme_Engineer.docx')
+  })
+})
+
+describe('resolveText', () => {
+  const rewriteMap = new Map([['r0-b0', 'rewritten text']])
+
+  it('returns original when explicitly rejected, even if edit exists', () => {
+    expect(resolveText('r0-b0', 'original', { 'r0-b0': false }, { 'r0-b0': 'my edit' }, rewriteMap))
+      .toBe('original')
+  })
+
+  it('returns edit when bullet was edited (implicit accept)', () => {
+    expect(resolveText('r0-b0', 'original', { 'r0-b0': true }, { 'r0-b0': 'my edit' }, rewriteMap))
+      .toBe('my edit')
+  })
+
+  it('returns edit even without explicit review (edit = implicit accept)', () => {
+    expect(resolveText('r0-b0', 'original', {}, { 'r0-b0': 'my edit' }, rewriteMap))
+      .toBe('my edit')
+  })
+
+  it('returns rewrite when accepted with no edit', () => {
+    expect(resolveText('r0-b0', 'original', { 'r0-b0': true }, {}, rewriteMap))
+      .toBe('rewritten text')
+  })
+
+  it('returns original when unreviewed with no edit', () => {
+    expect(resolveText('r0-b0', 'original', {}, {}, rewriteMap))
+      .toBe('original')
+  })
+
+  it('returns original when rejected with no edit', () => {
+    expect(resolveText('r0-b0', 'original', { 'r0-b0': false }, {}, rewriteMap))
+      .toBe('original')
+  })
+
+  it('returns original for bullet not in rewrite map, accepted but no edit', () => {
+    expect(resolveText('r0-b1', 'original', { 'r0-b1': true }, {}, rewriteMap))
+      .toBe('original')
   })
 })

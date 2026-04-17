@@ -17,6 +17,7 @@ interface BulletRowProps {
   onReject: () => void
   onEdit: (text: string) => void
   flaggedForRemoval?: boolean
+  removalReason?: string
 }
 
 export default function BulletRow({
@@ -30,6 +31,7 @@ export default function BulletRow({
   onReject,
   onEdit,
   flaggedForRemoval = false,
+  removalReason,
 }: BulletRowProps) {
   const [editing, setEditing] = useState(false)
   const displayText = edit ?? rewritten
@@ -39,12 +41,14 @@ export default function BulletRow({
       className="grid gap-4 py-3 px-3 rounded"
       style={{
         gridTemplateColumns: '1fr 1fr',
-        backgroundColor: review === true ? '#F0FDF4' : review === false ? '#FFF5F5' : '#FFFFFF',
+        backgroundColor: flaggedForRemoval
+          ? (review === true ? '#FEF2F2' : review === false ? '#F0FDF4' : '#FFFFFF')
+          : (review === true ? '#F0FDF4' : review === false ? '#FEF2F2' : '#FFFFFF'),
         borderBottom: '1px solid #F3F4F6',
       }}
     >
       {/* Original */}
-      <div className="text-sm" style={{ color: '#6B7280' }}>
+      <div style={{ fontSize: '0.8125rem', color: '#6B7280' }}>
         <span style={{ textDecoration: flaggedForRemoval && review === true ? 'line-through' : 'none' }}>
           {original}
         </span>
@@ -54,8 +58,8 @@ export default function BulletRow({
       <div className="flex flex-col gap-1.5">
         {editing ? (
           <textarea
-            className="text-sm w-full rounded p-1.5 outline-none resize-none"
-            style={{ border: '1px solid #D1D5DB', borderRadius: 4, minHeight: 72 }}
+            className="w-full rounded p-1.5 outline-none resize-none"
+            style={{ fontSize: '0.8125rem', border: '1px solid #D1D5DB', borderRadius: 4, minHeight: 72 }}
             defaultValue={displayText}
             autoFocus
             onBlur={(e) => {
@@ -65,12 +69,21 @@ export default function BulletRow({
           />
         ) : (
           <p
-            className="text-sm cursor-text"
-            style={{ color: '#111827' }}
+            className="cursor-text"
+            style={{ fontSize: '0.8125rem', color: '#111827' }}
             onClick={() => !flaggedForRemoval && setEditing(true)}
             title={flaggedForRemoval ? undefined : 'Click to edit'}
           >
-            {flaggedForRemoval ? <em style={{ color: '#9CA3AF' }}>Flagged for removal</em> : displayText}
+            {flaggedForRemoval ? (
+              <span>
+                <em style={{ color: '#9CA3AF' }}>Flagged for removal</em>
+                {removalReason && (
+                  <span style={{ display: 'block', fontSize: '0.75rem', color: '#9CA3AF', marginTop: 2 }}>
+                    {removalReason}
+                  </span>
+                )}
+              </span>
+            ) : displayText}
           </p>
         )}
 
@@ -91,7 +104,7 @@ export default function BulletRow({
                 </svg>
               </button>
             )}
-            <AcceptRejectToggle review={review} onAccept={onAccept} onReject={onReject} />
+            <AcceptRejectToggle review={review} onAccept={onAccept} onReject={onReject} variant={flaggedForRemoval ? 'removal' : 'rewrite'} />
           </div>
         </div>
       </div>

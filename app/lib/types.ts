@@ -109,6 +109,7 @@ export interface ActiveSession {
   arc_alignment?: string
   bullet_reviews?: Record<string, boolean>
   bullet_edits?: Record<string, string>
+  excluded_out_of_scope_roles?: string[]
 }
 
 export interface StoredMessage {
@@ -218,6 +219,7 @@ export interface ClientState {
   bulletReviews: Record<string, boolean>
   bulletEdits: Record<string, string>
   unreviewedCount: number
+  excludedOutOfScopeRoles: string[]
   quantificationQuestions: QuantificationQuestion[] | null
   error: { code: string; message: string } | null
 }

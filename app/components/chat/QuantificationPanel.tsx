@@ -53,21 +53,20 @@ export default function QuantificationPanel({ questions, isStreaming, onSubmit }
         <div className="mx-auto max-w-[900px]">
           <div className="rounded-lg overflow-hidden" style={{ border: '1px solid #E5E7EB' }}>
 
-            {/* Column headers — matches RoleSection headers */}
+            {/* Column headers */}
             <div
-              className="grid gap-4 px-3 py-2 text-xs font-medium"
+              className="grid gap-4 px-3 py-2"
               style={{
                 gridTemplateColumns: '1fr 1fr',
                 backgroundColor: '#F9FAFB',
                 borderBottom: '1px solid #E5E7EB',
-                color: '#6B7280',
               }}
             >
-              <span>Your bullet</span>
-              <span>What&apos;s needed</span>
+              <span style={{ fontSize: '0.6875rem', fontWeight: 500, color: '#9CA3AF', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Your bullet</span>
+              <span style={{ fontSize: '0.6875rem', fontWeight: 500, color: '#9CA3AF', textTransform: 'uppercase', letterSpacing: '0.05em' }}>What&apos;s needed</span>
             </div>
 
-            {/* Question rows — matches BulletRow layout */}
+            {/* Question rows */}
             {questions.map((q, i) => (
               <div
                 key={i}
@@ -78,12 +77,12 @@ export default function QuantificationPanel({ questions, isStreaming, onSubmit }
                   borderBottom: i < questions.length - 1 ? '1px solid #F3F4F6' : 'none',
                 }}
               >
-                <p className="text-sm" style={{ color: '#6B7280' }}>
+                <p style={{ fontSize: '0.8125rem', color: '#6B7280' }}>
                   {q.bullet}
                 </p>
 
                 <div className="flex flex-col gap-2">
-                  <p className="text-sm" style={{ color: '#111827' }}>
+                  <p style={{ fontSize: '0.8125rem', color: '#111827' }}>
                     {q.question}
                   </p>
                   <input
@@ -92,8 +91,9 @@ export default function QuantificationPanel({ questions, isStreaming, onSubmit }
                     onChange={e => setAnswer(i, e.target.value)}
                     onKeyDown={e => { if (e.key === 'Enter' && i === questions.length - 1) onSubmit(answers) }}
                     placeholder="Enter a number, or leave blank to skip"
-                    className="text-sm w-full outline-none"
+                    className="w-full outline-none"
                     style={{
+                      fontSize: '0.8125rem',
                       border: '1px solid #D1D5DB',
                       borderRadius: 4,
                       padding: '5px 8px',

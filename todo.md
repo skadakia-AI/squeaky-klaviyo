@@ -4,6 +4,9 @@
 
 ### UX Polish
 - [ ] **Fit assessment verdict display** — verdict banner looks machine-esque; needs visual cleanup (easy, UI-only)
+- [ ] **QuantificationPanel design** — apply FitAssessmentCard card aesthetic (card shell, color scheme, typography). Functional flow is correct; visual-only pass. Light lift.
+- [ ] **Diff view design** — apply FitAssessmentCard aesthetic to DiffViewPanel and BulletRow. Functional already (accept/reject/inline edit all work); purely visual. Medium lift.
+- [ ] **User navigation** — navigating between stages of the flow (dashboard → active session → step progress) and revisiting earlier outputs (decoded JD, fit assessment) without losing state. Requires workspace design decision first.
 - [ ] **Workspace design** — define what the user's workspace should look and feel like: navigation, save/revisit JD decode and fit assessment, overall information architecture. *Scope this before building.*
 - [ ] **App landing page & onboarding** — app entry point for new users: value prop, sign-in/up, empty state, first-use guidance. Distinct from the marketing landing page.
 - [ ] **User onboarding flow** — guide new users through first session: what to paste, what to expect at each step, why it matters.
@@ -12,7 +15,8 @@
 - [ ] **Stripe integration** — paywall for usage beyond a free tier. Decide on model (per-session, subscription, seat) before building.
 
 ### Skill Improvements
-- [ ] **Non-bullet resume sections** — rewrite should also handle skills, summary, projects sections. Requires schema changes (types.ts), skill prompt additions, diff view extensions. *Schema design is the gating work.*
+- [ ] **Non-bullet resume sections** — targeting should also rewrite the summary, skills, and projects sections (not just experience bullets). Requires schema changes (types.ts), skill prompt additions, diff view extensions. *Schema design is the gating work.*
+- [ ] **Resume formatting fidelity** — downloaded .docx should match the original uploaded resume as closely as possible: fonts, margins, section spacing, header style. Currently export uses a generic template. Requires reading and replicating the source document's formatting.
 - [ ] **JD Decoder tone** — make output spikier and more opinionated (voice/tone pass on skill prompt)
 - [ ] **JD Decoder section enforcement** — hard limit on section output counts not being respected; needs per-section enforcement
 - [ ] **Progressive JD disclosure** — surface the right decoded intel at the right step (business context + no-brainer hire upfront; requirements for fit; targeting signals for rewrite) rather than dumping everything at once
@@ -26,7 +30,7 @@
 - [ ] **Eval: JD decoder output quality** — section counts, bullet length, tone
 
 ### Orchestrator Guardrails
-- [ ] Input validation: detect when uploaded content is not a JD and respond gracefully instead of advancing state
+- [ ] Input validation: detect when uploaded content is not a JD (at `jd_loaded`) or not a resume (at `resume_loaded`) and respond gracefully instead of advancing state
 - [ ] **Out-of-order step requests** — user asking to go back mid-flow (e.g., "use a different JD" at assessed) routes to handleChat. Needs proper handling.
 - [ ] **Reminder bubble UX** — `handleChat` appends a separate reminder bubble after streamed response. Consider folding into streamed reply instead.
 

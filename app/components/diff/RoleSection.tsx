@@ -5,6 +5,7 @@ import type { Role, TargetingRewrite, TargetingRemoval } from '../../lib/types'
 interface RoleSectionProps {
   role: Role
   inScope: boolean
+  bulletsExcluded: boolean
   rewrites: TargetingRewrite[]
   removals: TargetingRemoval[]
   bulletReviews: Record<string, boolean>
@@ -12,11 +13,13 @@ interface RoleSectionProps {
   onAccept: (bulletId: string) => void
   onReject: (bulletId: string) => void
   onEdit: (bulletId: string, text: string) => void
+  onToggleExclude: () => void
 }
 
 export default function RoleSection({
   role,
   inScope,
+  bulletsExcluded,
   rewrites,
   removals,
   bulletReviews,
@@ -24,47 +27,62 @@ export default function RoleSection({
   onAccept,
   onReject,
   onEdit,
+  onToggleExclude,
 }: RoleSectionProps) {
   const rewriteMap = Object.fromEntries(rewrites.map(r => [r.bullet_id, r]))
   const removalMap = Object.fromEntries(removals.map(r => [r.bullet_id, r]))
 
   return (
     <div className="mb-6">
-      {/* Role header */}
-      <div className="mb-2 px-3">
-        <div className="flex items-baseline gap-2">
-          <span className="text-sm font-semibold" style={{ color: inScope ? '#111827' : '#9CA3AF' }}>
-            {role.title}
-          </span>
-          <span className="text-xs" style={{ color: '#9CA3AF' }}>
-            {role.company}
-            {role.start_date && ` · ${role.start_date}–${role.end_date ?? 'Present'}`}
-          </span>
-          {!inScope && (
-            <span className="text-xs italic ml-auto" style={{ color: '#D1D5DB' }}>
-              out of scope
-            </span>
-          )}
-        </div>
-      </div>
-
-      {/* Bullets */}
       <div
         className="rounded-lg overflow-hidden"
         style={{ border: '1px solid #E5E7EB' }}
       >
+        {/* Role header strip — inside the card */}
+        <div
+          className="px-3 py-2.5 flex items-baseline gap-2"
+          style={{ backgroundColor: '#F9FAFB', borderBottom: '1px solid #E5E7EB' }}
+        >
+          <span style={{ fontSize: '0.8125rem', fontWeight: 600, color: inScope ? '#111827' : '#9CA3AF' }}>
+            {role.title}
+          </span>
+          <span style={{ fontSize: '0.75rem', color: '#9CA3AF' }}>
+            {role.company}
+            {role.start_date && ` · ${role.start_date}–${role.end_date ?? 'Present'}`}
+          </span>
+          {!inScope && (
+            <div className="flex items-center gap-2 ml-auto">
+              <button
+                onClick={onToggleExclude}
+                style={{
+                  fontSize: '0.6875rem',
+                  padding: '2px 8px',
+                  borderRadius: 4,
+                  border: '1px solid',
+                  borderColor: bulletsExcluded ? '#FECACA' : '#E5E7EB',
+                  backgroundColor: bulletsExcluded ? '#FEF2F2' : '#FFFFFF',
+                  color: bulletsExcluded ? '#991B1B' : '#6B7280',
+                  cursor: 'pointer',
+                }}
+              >
+                {bulletsExcluded ? 'Bullets excluded from resume' : 'Exclude bullets from resume'}
+              </button>
+            </div>
+          )}
+        </div>
+
         {/* Column headers for in-scope roles */}
         {inScope && (
           <div
-            className="grid gap-4 px-3 py-2 text-xs font-medium"
-            style={{ gridTemplateColumns: '1fr 1fr', backgroundColor: '#F9FAFB', borderBottom: '1px solid #E5E7EB', color: '#6B7280' }}
+            className="grid gap-4 px-3 py-2"
+            style={{ gridTemplateColumns: '1fr 1fr', backgroundColor: '#FFFFFF', borderBottom: '1px solid #E5E7EB' }}
           >
-            <span>Original</span>
-            <span>Rewritten</span>
+            <span style={{ fontSize: '0.6875rem', fontWeight: 500, color: '#9CA3AF', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Original</span>
+            <span style={{ fontSize: '0.6875rem', fontWeight: 500, color: '#9CA3AF', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Rewritten</span>
           </div>
         )}
 
-        {role.bullets.map(bullet => {
+        {!inScope && bulletsExcluded ? null : role.bullets.map(bullet => {
           if (!inScope) {
             return <OutOfScopeBullet key={bullet.id} text={bullet.text} />
           }
@@ -105,6 +123,7 @@ export default function RoleSection({
                 onReject={() => onReject(bullet.id)}
                 onEdit={(text) => onEdit(bullet.id, text)}
                 flaggedForRemoval
+                removalReason={removal.reason}
               />
             )
           }

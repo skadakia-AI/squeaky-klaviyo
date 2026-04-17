@@ -1,6 +1,20 @@
 import { getServiceClient } from '../supabase'
 import type { Resume, TargetingOutput } from '../types'
 
+// Priority: explicit rejection → edited text → accepted rewrite → original
+export function resolveText(
+  bulletId: string,
+  originalText: string,
+  bulletReviews: Record<string, boolean>,
+  bulletEdits: Record<string, string>,
+  rewriteMap: Map<string, string>
+): string {
+  if (bulletReviews[bulletId] === false) return originalText
+  if (bulletEdits[bulletId]) return bulletEdits[bulletId]
+  if (rewriteMap.has(bulletId) && bulletReviews[bulletId] === true) return rewriteMap.get(bulletId)!
+  return originalText
+}
+
 // Builds a human-readable download filename from resume owner name + session metadata.
 // Each segment is slugified (non-alphanumeric → hyphen, collapsed). Parts are capped
 // so the total stays well under OS filename limits.
@@ -43,7 +57,7 @@ export async function exportResume(input: ExportResumeInput): Promise<ExportResu
   // ── 1. Fetch session ─────────────────────────────────────────────────────
   const { data: session, error: sessionError } = await supabase
     .from('sessions')
-    .select('bullet_reviews, bullet_edits, user_id, company, role')
+    .select('bullet_reviews, bullet_edits, excluded_out_of_scope_roles, user_id, company, role')
     .eq('id', input.sessionId)
     .single()
 
@@ -52,6 +66,7 @@ export async function exportResume(input: ExportResumeInput): Promise<ExportResu
 
   const bulletReviews: Record<string, boolean> = session.bullet_reviews ?? {}
   const bulletEdits: Record<string, string> = session.bullet_edits ?? {}
+  const excludedOutOfScopeRoles: string[] = session.excluded_out_of_scope_roles ?? []
 
   // ── 2. Fetch source files ────────────────────────────────────────────────
   const basePath = `users/${input.userId}/${input.sessionId}`
@@ -75,12 +90,6 @@ export async function exportResume(input: ExportResumeInput): Promise<ExportResu
   )
 
   const rewriteMap = new Map(targeting.rewrites.map(r => [r.bullet_id, r.rewritten]))
-
-  function resolveText(bulletId: string, originalText: string): string {
-    if (bulletEdits[bulletId]) return bulletEdits[bulletId]
-    if (rewriteMap.has(bulletId) && bulletReviews[bulletId] === true) return rewriteMap.get(bulletId)!
-    return originalText
-  }
 
   // ── 4. Generate docx ─────────────────────────────────────────────────────
   let docxBuffer: Buffer
@@ -123,10 +132,14 @@ export async function exportResume(input: ExportResumeInput): Promise<ExportResu
     }
 
     // Experience
+    const scopeSet = new Set(targeting.scope ?? [])
     const experienceRoles = resume.experience.map(role => {
-      const remainingBullets = role.bullets.filter(b => !removedBulletIds.has(b.id))
+      const bulletsExcluded = !scopeSet.has(role.id) && excludedOutOfScopeRoles.includes(role.id)
+      const remainingBullets = bulletsExcluded
+        ? []
+        : role.bullets.filter(b => !removedBulletIds.has(b.id))
       return { role, remainingBullets }
-    }).filter(({ remainingBullets }) => remainingBullets.length > 0)
+    })
 
     if (experienceRoles.length > 0) {
       children.push(sectionHeading('Experience'))
@@ -156,7 +169,7 @@ export async function exportResume(input: ExportResumeInput): Promise<ExportResu
           children.push(new Paragraph({
             bullet: { level: 0 },
             spacing: { after: 40 },
-            children: [new TextRun({ text: resolveText(bullet.id, bullet.text), size: 22, font: FONT })],
+            children: [new TextRun({ text: resolveText(bullet.id, bullet.text, bulletReviews, bulletEdits, rewriteMap), size: 22, font: FONT })],
           }))
         }
       }

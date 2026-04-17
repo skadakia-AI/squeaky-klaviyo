@@ -13,7 +13,8 @@ export async function getActiveSession(): Promise<{ session: ActiveSession | nul
 export async function postReviews(
   sessionId: string,
   bulletReviews: Record<string, boolean>,
-  bulletEdits: Record<string, string>
+  bulletEdits: Record<string, string>,
+  excludedOutOfScopeRoles: string[]
 ): Promise<{ success: boolean }> {
   try {
     const accepted = Object.values(bulletReviews).filter(Boolean).length
@@ -25,6 +26,7 @@ export async function postReviews(
         bullet_reviews: bulletReviews,
         bullet_edits: bulletEdits,
         bullets_accepted: accepted,
+        excluded_out_of_scope_roles: excludedOutOfScopeRoles,
       }),
     })
     if (!res.ok) return { success: false }
