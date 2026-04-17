@@ -19,7 +19,7 @@
 - [ ] **Progressive JD disclosure** — surface the right decoded intel at the right step (business context + no-brainer hire upfront; requirements for fit; targeting signals for rewrite) rather than dumping everything at once
 
 ### Observability & Evals
-- [ ] **Sentry** — error monitoring for unhandled exceptions in route + orchestrator. Next.js first-class integration, wizard auto-configures most of it. Easy.
+- [x] **Sentry** — error monitoring for unhandled exceptions in route + orchestrator.
 - [ ] **AI observability (Langfuse)** — trace every Claude call: latency, token cost, inputs/outputs per skill. Langfuse preferred over Helicone because it handles both tracing and evals in one tool, directly supporting the evals items below. Medium effort, high value.
 - [ ] **Product telemetry** — user behavior: step completion rates, drop-off points, session counts. Supabase events table already captures some events (decode_completed, verdict_delivered, resume_targeted) — extend and surface. Consider PostHog if a full analytics UI is wanted. Easy.
 - [ ] **AI evals for all skill agents** — structured criteria per skill output (jd-decoder, jd-match, resume-targeting), benchmark inputs, pass/fail scoring, regression tracking across prompt changes. Langfuse (above) is the recommended platform. Not "test until it feels right."
@@ -27,7 +27,7 @@
 - [ ] **Eval: JD decoder output quality** — section counts, bullet length, tone
 
 ### Orchestrator Guardrails
-- [ ] Input validation: detect when uploaded content is not a JD (at `jd_loaded`) or not a resume (at `resume_loaded`) and respond gracefully instead of advancing state
+- [x] Input validation: Haiku classification rejects non-JD content in `load-jd.ts` and non-resume content in `load-resume.ts` before advancing state
 - [ ] **Out-of-order step requests** — user asking to go back mid-flow (e.g., "use a different JD" at assessed) routes to handleChat. Needs proper handling.
 - [ ] **Reminder bubble UX** — `handleChat` appends a separate reminder bubble after streamed response. Consider folding into streamed reply instead.
 
@@ -84,3 +84,7 @@
 - [x] Fit assessment verdict display — colored banner, key factors, arc alignment row, narrative with color-coded status dots
 - [x] QuantificationPanel design — card shell, uppercase column headers, matching DiffHeader aesthetic
 - [x] Diff view design — DiffHeader card style, BulletRow color-coded rows, consistent typography
+- [x] Input validation — Haiku classification in `load-jd.ts` (rejects About pages, blog posts) and `load-resume.ts` (rejects essays, cover letters) before advancing state
+- [x] Error handler strips stale progress messages on failure
+- [x] JDDecodeCard upload prompt footer is conditional — hides once user moves past `decoded` step
+- [x] Sentry error monitoring and session replay

@@ -112,10 +112,10 @@ The orchestrator reads `current_step` from the session record. It's `'created'`.
 `loadJD` lives in `app/lib/utils/load-jd.ts`. It:
 1. Validates the URL
 2. Fetches it via Jina's reader API (which converts web pages to clean text)
-3. Checks if the result looks like a real JD (word count, keyword signals)
+3. Calls Haiku to classify whether the content is a job description — rejects About pages, blog posts, etc. Fails open on API error.
 4. Writes `raw_jd.md` to Supabase Storage
 5. Logs entries in the `files` and `events` Postgres tables
-6. Returns `{ success: true, rawText: '...', sparse: false }`
+6. Returns `{ success: true, rawText: '...' }`
 
 If any step fails, it returns `{ success: false, error: '...', message: '...' }` immediately. No retry — that's the orchestrator's job.
 
@@ -189,6 +189,7 @@ User pastes JD
         ↓
 User uploads resume
   └─► loadResume()
+        calls Haiku to classify whether content is a resume (rejects essays, cover letters)
         calls Haiku to extract structure
         writes: resume_main.md, resume_structured.json
         ↓
@@ -355,8 +356,8 @@ Utilities are the I/O layer. They have no routing logic, no Claude calls, no sta
 | `storage.ts` | Read and write files in the Supabase Storage bucket. The only place in the codebase that touches Storage. |
 | `messages.ts` | Read and write message history in the Supabase messages table. |
 | `update-session.ts` | Write session metadata (current_step, verdict, etc.) to the Supabase sessions table. |
-| `load-jd.ts` | Extract JD text from URL/PDF/plain text, validate it, write `raw_jd.md`, log events. |
-| `load-resume.ts` | Parse resume file (PDF/DOCX/text), call Haiku for structured extraction, write resume files, log events. |
+| `load-jd.ts` | Extract JD text from URL/PDF/plain text, call Haiku to verify it's a real job description, write `raw_jd.md`, log events. |
+| `load-resume.ts` | Parse resume file (PDF/DOCX/text), call Haiku to verify it's a real resume, call Haiku for structured extraction, write resume files, log events. |
 | `export-resume.ts` | Apply bullet reviews, edits, and out-of-scope role exclusions; generate DOCX; write to storage; return signed download URL. Resolution order for each bullet: explicit rejection → original; edit present → edited text; accepted → AI rewrite; else → original. Out-of-scope roles in `excluded_out_of_scope_roles` export header only (no bullets). Download filename derived from user initials + session company + role (e.g. `SK_Acme-Corp_Senior-Engineer.docx`). |
 
 All utilities return `{ success: true, ...data }` or `{ success: false, error: string, message: string }`. They never throw. They never retry. The orchestrator decides what to do with failures.
