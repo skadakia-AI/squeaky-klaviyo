@@ -1,6 +1,8 @@
 # Squeaky — Frontend Spec
 **Last updated: April 2026**
 
+> **Note: Diff view section is partially stale as of April 2026.** The download button is now gated on `unreviewedCount === 0` (not always enabled). Accept/reject uses two buttons (not a cycle toggle). Removal rows use X=remove / ✓=keep semantics. Out-of-scope roles have a per-role "Exclude bullets from resume" toggle rather than a shared divider. `unreviewedCount` includes both rewrites and flagged-for-removal bullets.
+
 ---
 
 ## Design Principles

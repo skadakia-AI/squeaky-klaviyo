@@ -38,8 +38,10 @@ This is a JavaScript object in RAM in the user's browser tab. It contains:
 | `showDiffView` | Whether the diff panel is open |
 | `targetingData` | The structured targeting output (rewrites, removals) for the diff view |
 | `resumeData` | The structured resume for the diff view |
-| `bulletReviews` | Accept/reject decisions the user has made |
-| `bulletEdits` | Manual edits the user has made to bullets |
+| `bulletReviews` | Accept/reject decisions the user has made. For rewrite bullets: `true` = accept rewrite, `false` = keep original. For removal bullets: `true` = remove from export, `false` = keep. Editing a bullet auto-sets its review to `true`. |
+| `bulletEdits` | Manual edits the user has made to rewritten bullets. Edit takes priority over the AI rewrite; explicit rejection still overrides an edit. Resolution order: rejected → original; edited → edit; accepted → rewrite; else → original. |
+| `unreviewedCount` | Number of bullets still requiring a decision. Initialized as `rewrites.length + flagged_for_removal.length`. Decremented when a bullet is accepted, rejected, or edited for the first time. Download is gated on this reaching zero. |
+| `excludedOutOfScopeRoles` | Role IDs the user has opted to exclude from the export. Out-of-scope roles are exported with header only (company, title, dates) when excluded; bullets are hidden in the diff view and stripped from the docx. Default: empty (all bullets included). |
 | `error` | The current error state, if any |
 
 This state is **ephemeral**. Closing the tab resets it to zero. It is never written to a database. When the user returns to the app, `getActiveSession()` fetches the session record and message history from Supabase and reconstructs a version of this state from that data.
@@ -213,7 +215,7 @@ User confirms targeting scope
 User downloads resume
   └─► exportResume()
         reads:  targeted_resume.json, resume_structured.json
-               bullet_reviews and bullet_edits from session
+               bullet_reviews, bullet_edits, excluded_out_of_scope_roles from session
         writes: export.docx
 ```
 
@@ -355,7 +357,7 @@ Utilities are the I/O layer. They have no routing logic, no Claude calls, no sta
 | `update-session.ts` | Write session metadata (current_step, verdict, etc.) to the Supabase sessions table. |
 | `load-jd.ts` | Extract JD text from URL/PDF/plain text, validate it, write `raw_jd.md`, log events. |
 | `load-resume.ts` | Parse resume file (PDF/DOCX/text), call Haiku for structured extraction, write resume files, log events. |
-| `export-resume.ts` | Apply bullet reviews and edits, generate DOCX, write to storage, return signed download URL. Download filename is derived from the user's initials + session company + role (e.g. `SK_Acme-Corp_Senior-Engineer.docx`). |
+| `export-resume.ts` | Apply bullet reviews, edits, and out-of-scope role exclusions; generate DOCX; write to storage; return signed download URL. Resolution order for each bullet: explicit rejection → original; edit present → edited text; accepted → AI rewrite; else → original. Out-of-scope roles in `excluded_out_of_scope_roles` export header only (no bullets). Download filename derived from user initials + session company + role (e.g. `SK_Acme-Corp_Senior-Engineer.docx`). |
 
 All utilities return `{ success: true, ...data }` or `{ success: false, error: string, message: string }`. They never throw. They never retry. The orchestrator decides what to do with failures.
 
