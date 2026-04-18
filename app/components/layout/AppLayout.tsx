@@ -6,15 +6,12 @@ import DiffViewPanel from '../diff/DiffViewPanel'
 import QuantificationPanel from '../chat/QuantificationPanel'
 import { useSession } from '../../lib/session'
 
-export default function AppLayout() {
-  const session = useSession()
+export default function AppLayout({ initialSessionId = null }: { initialSessionId?: string | null }) {
+  const session = useSession(initialSessionId)
 
   return (
     <div className="flex flex-col h-screen" style={{ backgroundColor: '#F9FAFB' }}>
-      <Header
-        hasActiveSession={!!session.sessionId}
-        onNewRole={session.startNewSession}
-      />
+      <Header onNewRole={session.startNewSession} />
       <div className="flex flex-col flex-1 overflow-hidden" style={{ marginTop: 48 }}>
         <ChatPane session={session} />
       </div>

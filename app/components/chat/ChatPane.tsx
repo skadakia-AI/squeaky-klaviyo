@@ -16,7 +16,7 @@ interface ChatPaneProps {
 export default function ChatPane({ session }: ChatPaneProps) {
   const { messages, isStreaming, checkpoint, currentStep, showDiffView,
     bulletReviews, bulletEdits, sendMessage, clearCheckpoint, acceptBullet, rejectBullet,
-    editBullet, pendingRecovery, continueSession, abandonSession, startNewSession } = session
+    editBullet, startNewSession } = session
   const bottomRef = useRef<HTMLDivElement>(null)
   const [arcCorrectionMode, setArcCorrectionMode] = useState(false)
 
@@ -64,43 +64,8 @@ export default function ChatPane({ session }: ChatPaneProps) {
       >
         <div className="mx-auto max-w-[680px] flex flex-col gap-4">
 
-          {/* Session recovery prompt */}
-          {pendingRecovery && (
-            <div
-              className="rounded-lg px-4 py-3 text-sm flex flex-col gap-2"
-              style={{ backgroundColor: '#F3F4F6', color: '#111827', borderRadius: 8 }}
-            >
-              <span>
-                You were working on{' '}
-                <strong>{pendingRecovery.session.role ?? 'a role'}</strong>
-                {pendingRecovery.session.company ? ` at ${pendingRecovery.session.company}` : ''}.
-                Continue where you left off?
-              </span>
-              <div className="flex gap-2">
-                <button
-                  onClick={() => continueSession(
-                    pendingRecovery.session.id,
-                    pendingRecovery.messages,
-                    pendingRecovery.session
-                  )}
-                  className="px-3 py-1 text-xs font-medium rounded"
-                  style={{ backgroundColor: '#111827', color: '#FFFFFF', borderRadius: 4 }}
-                >
-                  Continue
-                </button>
-                <button
-                  onClick={abandonSession}
-                  className="px-3 py-1 text-xs rounded"
-                  style={{ backgroundColor: '#E5E7EB', color: '#6B7280', borderRadius: 4 }}
-                >
-                  Start fresh
-                </button>
-              </div>
-            </div>
-          )}
-
           {/* Empty state */}
-          {messages.length === 0 && !pendingRecovery && (
+          {messages.length === 0 && (
             <p className="text-sm" style={{ color: '#6B7280' }}>
               Drop in a job description — paste a URL, upload a PDF, or paste the text directly.
               I&apos;ll decode what the hiring manager actually wants.

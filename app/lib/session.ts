@@ -1,19 +1,19 @@
 'use client'
 
 import { useState, useEffect, useRef, useCallback } from 'react'
+import { useRouter } from 'next/navigation'
 import type {
   ClientState,
   ChatMessage,
   CurrentStep,
   OutboundMessage,
   SSEEvent,
-  ActiveSession,
   StoredMessage,
   TargetingOutput,
   FitAssessmentData,
   Resume,
 } from './types'
-import { getActiveSession, postReviews } from './api'
+import { fetchSessionById, postReviews } from './api'
 import { openStream } from './sse'
 
 // Parses the machine-readable verdict block out of raw LLM output text.
@@ -163,9 +163,9 @@ function toMsg(m: StoredMessage): ChatMessage {
   }
 }
 
-export function useSession() {
+export function useSession(initialSessionId: string | null = null) {
   const [state, setState] = useState<ClientState>(initialState)
-  const [pendingRecovery, setPendingRecovery] = useState<{ session: ActiveSession; messages: StoredMessage[] } | null>(null)
+  const router = useRouter()
 
   const stateRef = useRef(state)
   const cleanupRef = useRef<(() => void) | null>(null)
@@ -174,11 +174,28 @@ export function useSession() {
     stateRef.current = state
   })
 
+  // If a session ID was provided in the URL, hydrate directly from DB.
+  // If null (lazy mode), wait for the user's first message to create one.
   useEffect(() => {
-    getActiveSession().then(({ session, messages }) => {
-      if (session) setPendingRecovery({ session, messages })
+    if (!initialSessionId) return
+    fetchSessionById(initialSessionId).then(result => {
+      if (!result) {
+        router.replace('/')
+        return
+      }
+      const { session, messages } = result
+      setState(prev => ({
+        ...prev,
+        sessionId: session.id,
+        currentStep: session.current_step,
+        messages: messages.map(toMsg),
+        bulletReviews: session.bullet_reviews ?? {},
+        bulletEdits: session.bullet_edits ?? {},
+        excludedOutOfScopeRoles: session.excluded_out_of_scope_roles ?? [],
+      }))
     })
-  }, [])
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [initialSessionId])
 
   // ─── SSE event handler ──────────────────────────────────────────────────────
 
@@ -186,6 +203,10 @@ export function useSession() {
     switch (event.type) {
       case 'session_created':
         setState(prev => ({ ...prev, sessionId: event.session_id }))
+        // In lazy mode (/session/new), update the URL to the real session ID
+        if (!initialSessionId) {
+          router.replace(`/session/${event.session_id}`)
+        }
         break
 
       case 'token':
@@ -260,7 +281,7 @@ export function useSession() {
         setState(prev => applyDone(prev))
         break
     }
-  }, [])
+  }, [initialSessionId, router])
 
   // ─── Actions ────────────────────────────────────────────────────────────────
 
@@ -282,24 +303,6 @@ export function useSession() {
     cleanupRef.current?.()
     cleanupRef.current = openStream(message, stateRef.current.sessionId, handleEvent)
   }, [handleEvent])
-
-  const continueSession = useCallback((sessionId: string, messages: StoredMessage[], session: ActiveSession) => {
-    setState(prev => ({
-      ...prev,
-      sessionId,
-      currentStep: session.current_step,
-      messages: messages.map(toMsg),
-      bulletReviews: session.bullet_reviews ?? {},
-      bulletEdits: session.bullet_edits ?? {},
-      excludedOutOfScopeRoles: session.excluded_out_of_scope_roles ?? [],
-    }))
-    setPendingRecovery(null)
-  }, [])
-
-  const abandonSession = useCallback(() => {
-    setPendingRecovery(null)
-    setState(initialState)
-  }, [])
 
   const acceptBullet = useCallback((bulletId: string) => {
     setState(prev => {
@@ -380,7 +383,8 @@ export function useSession() {
     cleanupRef.current?.()
     cleanupRef.current = null
     setState(initialState)
-  }, [])
+    router.push('/session/new')
+  }, [router])
 
   return {
     sessionId: state.sessionId,
@@ -397,10 +401,7 @@ export function useSession() {
     excludedOutOfScopeRoles: state.excludedOutOfScopeRoles,
     quantificationQuestions: state.quantificationQuestions,
     error: state.error,
-    pendingRecovery,
     sendMessage,
-    continueSession,
-    abandonSession,
     acceptBullet,
     rejectBullet,
     editBullet,

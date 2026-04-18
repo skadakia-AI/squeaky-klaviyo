@@ -1,5 +1,18 @@
 # Squeaky — To-Do
 
+## Launch Checklist (ship these first)
+
+- [ ] **Clerk production mode** — flip Clerk to prod in dashboard, update env vars. No code changes.
+- [ ] **App landing + empty state** — new user signs in and sees a clear starting point, not a blank screen. Minimum viable onboarding.
+- [ ] **Per-user rate cap** — soft daily session limit via Supabase query. Cost protection before Stripe is in.
+- [ ] **Dashboard / pipeline view** — per-opportunity cards: company, title, fit verdict, step progress, download link. Backend state exists; display layer is the work.
+- [ ] **Summary + skills rewrites** — extend resume-targeting to rewrite summary and skills sections (not just bullets). Schema → prompt → diff view → export.
+- [ ] **Langfuse tracing** — trace every Claude call for latency, token cost, inputs/outputs. Required for observability from day one.
+- [ ] **Confirm Supabase prod project** — verify real user data will land in a production Supabase instance, not a dev one.
+- [ ] **JD Decoded card cleanup** — reduce verbosity, improve scannability. First impression of the product's output quality.
+
+---
+
 ## In Progress / Next Up
 
 ### UX Polish

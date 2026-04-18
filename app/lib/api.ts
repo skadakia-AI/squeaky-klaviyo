@@ -1,4 +1,55 @@
-import type { ActiveSession, StoredMessage } from './types'
+import type { ActiveSession, DashboardSession, StoredMessage } from './types'
+
+export async function fetchSessions(): Promise<DashboardSession[]> {
+  try {
+    const res = await fetch('/api/sessions')
+    if (!res.ok) return []
+    const data = await res.json()
+    return data.sessions ?? []
+  } catch {
+    return []
+  }
+}
+
+export async function fetchSessionById(sessionId: string): Promise<{ session: ActiveSession; messages: StoredMessage[] } | null> {
+  try {
+    const res = await fetch(`/api/session/${sessionId}`)
+    if (!res.ok) return null
+    return res.json()
+  } catch {
+    return null
+  }
+}
+
+export async function fetchArtifact(sessionId: string, type: 'jd' | 'fit' | 'resume'): Promise<string | null> {
+  try {
+    const res = await fetch(`/api/session/${sessionId}/artifacts?type=${type}`)
+    if (!res.ok) return null
+    const data = await res.json()
+    return data.content ?? null
+  } catch {
+    return null
+  }
+}
+
+export async function triggerExport(sessionId: string): Promise<{ downloadUrl: string } | null> {
+  try {
+    const res = await fetch(`/api/session/${sessionId}/export`, { method: 'POST' })
+    if (!res.ok) return null
+    return res.json()
+  } catch {
+    return null
+  }
+}
+
+export async function archiveSession(sessionId: string): Promise<boolean> {
+  try {
+    const res = await fetch(`/api/session/${sessionId}`, { method: 'DELETE' })
+    return res.ok
+  } catch {
+    return false
+  }
+}
 
 export async function getActiveSession(): Promise<{ session: ActiveSession | null; messages: StoredMessage[] }> {
   try {

@@ -34,6 +34,25 @@ export async function getActiveSession(supabase: SupabaseClient, userId: string)
   return data ?? null
 }
 
+export async function listSessions(supabase: SupabaseClient, userId: string) {
+  const { data } = await supabase
+    .from('sessions')
+    .select('id, company, role, current_step, status, verdict, arc_alignment, created_at, updated_at')
+    .eq('user_id', userId)
+    .neq('status', 'abandoned')
+    .neq('current_step', 'created')
+    .neq('current_step', 'jd_loaded')
+    .order('updated_at', { ascending: false })
+  return data ?? []
+}
+
+export async function archiveSession(supabase: SupabaseClient, sessionId: string, userId: string) {
+  return patchSession(supabase, sessionId, userId, {
+    status: 'abandoned',
+    updated_at: new Date().toISOString(),
+  })
+}
+
 // Updates a session only if owned by userId. Returns false on error or missing ownership.
 export async function patchSession(
   supabase: SupabaseClient,

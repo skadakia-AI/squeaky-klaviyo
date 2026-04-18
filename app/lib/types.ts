@@ -99,6 +99,18 @@ export type SSEEvent =
   | { type: 'error'; code: string; message: string }
   | { type: 'done' }
 
+export interface DashboardSession {
+  id: string
+  company: string | null
+  role: string | null
+  current_step: CurrentStep
+  status: string
+  verdict: string | null
+  arc_alignment: string | null
+  created_at: string
+  updated_at: string
+}
+
 export interface ActiveSession {
   id: string
   current_step: CurrentStep

@@ -142,6 +142,35 @@ A running log of significant design decisions — what was decided, what alterna
 
 ---
 
+## Dashboard & Routing
+
+### Lazy session creation via `/session/new`
+**Decision:** Navigating to `/session/new` does not create a session. The session ID is minted server-side on the first SSE event (`session_created`), then the client replaces the URL with `/session/{id}` via `router.replace`. The chat route and all API routes use `/session/[id]` with a dynamic segment.
+**Alternatives considered:** (A) Create session on page load and redirect immediately; (B) keep a fixed `/session` URL and pass session ID through state.
+**Rationale:** Option A creates junk sessions every time someone navigates to the new-session page (browser back, accidental visit, abandoned before submitting). Option B breaks shareability and browser history. Lazy creation means a session only exists once the user has submitted a JD — the session list stays clean. The `id === 'new'` check in the page component threads `initialSessionId = null` into `useSession`, which skips the hydration fetch and waits for `session_created` instead.
+
+---
+
+### Dashboard replaces the session recovery prompt
+**Decision:** The old "resume your last session?" prompt on page load has been removed. The dashboard at `/` is the recovery mechanism — it lists all in-progress sessions with a "Continue" button.
+**Alternatives considered:** Keep the recovery prompt alongside the dashboard.
+**Rationale:** The recovery prompt was a single-slot pattern that broke when a user had multiple in-progress sessions. The dashboard gives full visibility and explicit navigation. Removing the prompt simplifies the session page and eliminates the edge cases around what "active session" means.
+
+---
+
+### Sessions filtered at `decoded` step and above
+**Decision:** The dashboard `listSessions` query excludes `created` and `jd_loaded` steps.
+**Rationale:** Sessions stuck at `created` never had a successfully loaded JD (validation failure, bad URL, etc.). Sessions stuck at `jd_loaded` means the decode step hasn't completed. Neither represents a real application — showing them would clutter the dashboard with noise the user can't act on.
+
+---
+
+### Soft delete via `status = 'abandoned'`
+**Decision:** Removing an application from the dashboard sets `status = 'abandoned'` on the session row — no hard delete. `listSessions` filters out `abandoned` rows.
+**Alternatives considered:** Hard delete the session row and cascade to artifacts.
+**Rationale:** Hard deletion requires a cascade (storage files, messages, session row) and is irreversible. Soft delete preserves the data if we ever want to surface "archived" sessions or run analytics. Storage files are small and not billed at a rate that justifies complexity. The dashboard optimistically removes the row from state on click and refetches from the server on API failure.
+
+---
+
 ## Input Handling
 
 ### Paste supported alongside file upload and URL
