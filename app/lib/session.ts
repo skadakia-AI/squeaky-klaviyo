@@ -322,7 +322,7 @@ export function useSession(initialSessionId: string | null = null) {
         setState(prev => applyDone(prev))
         break
     }
-  }, [initialSessionId, router])
+  }, [initialSessionId])
 
   // ─── Actions ────────────────────────────────────────────────────────────────
 
