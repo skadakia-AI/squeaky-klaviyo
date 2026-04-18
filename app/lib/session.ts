@@ -15,6 +15,7 @@ import type {
 } from './types'
 import { fetchSessionById, fetchTargetingData, postReviews } from './api'
 import { openStream } from './sse'
+import { parseQuantificationQuestions } from './utils/parse-quantification'
 
 // Parses the machine-readable verdict block out of raw LLM output text.
 // Used for live streaming (render card as tokens arrive) and session recovery
@@ -191,6 +192,8 @@ export function useSession(initialSessionId: string | null = null) {
 
       // Derive checkpoint from step + message history (mirrors applyDone logic)
       let checkpoint: ClientState['checkpoint'] = null
+      let quantificationQuestions: ClientState['quantificationQuestions'] = null
+
       if (step === 'resume_loaded') {
         const lastMsg = mappedMessages[mappedMessages.length - 1]
         if (lastMsg?.role === 'assistant') checkpoint = 'arc_confirmation'
@@ -200,7 +203,19 @@ export function useSession(initialSessionId: string | null = null) {
           checkpoint = 'pursue_or_pass'
         } else {
           const lastAssistant = [...mappedMessages].reverse().find(m => m.role === 'assistant' && m.type === 'text')
-          if (lastAssistant?.content.includes("I'll rewrite")) checkpoint = 'scope_selection'
+          if (lastAssistant?.content.includes("I'll rewrite")) {
+            checkpoint = 'scope_selection'
+          } else {
+            // Sub-state 3: Turn 1 ran and asked for numbers but user left before submitting.
+            // The Turn 1 output is stored in DB — parse it to restore the quantification panel.
+            const assessedAssistant = messages
+              .filter(m => m.step === 'assessed' && m.role === 'assistant')
+            const lastAssessed = assessedAssistant[assessedAssistant.length - 1]
+            if (lastAssessed?.content.includes('Before I rewrite')) {
+              const parsed = parseQuantificationQuestions(lastAssessed.content)
+              if (parsed.length > 0) quantificationQuestions = parsed
+            }
+          }
         }
       }
 
@@ -232,6 +247,7 @@ export function useSession(initialSessionId: string | null = null) {
         bulletReviews: session.bullet_reviews ?? {},
         bulletEdits: session.bullet_edits ?? {},
         excludedOutOfScopeRoles: session.excluded_out_of_scope_roles ?? [],
+        quantificationQuestions,
       }))
     })
   // eslint-disable-next-line react-hooks/exhaustive-deps

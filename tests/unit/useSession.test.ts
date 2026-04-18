@@ -180,6 +180,66 @@ describe('useSession — checkpoint restoration on hydration', () => {
   })
 })
 
+describe('useSession — quantification panel restoration on hydration', () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+    mockOpenStream.mockReturnValue(() => {})
+    mockFetchTargetingData.mockResolvedValue(null)
+  })
+
+  it('restores quantificationQuestions when Turn 1 asked for numbers and user left before submitting', async () => {
+    const turn1Text = [
+      'Before I rewrite, I need a few numbers:',
+      '',
+      '- Built a data pipeline for daily ETL — what was the data volume processed per day?',
+      '- Led migration to Kubernetes — how many services were migrated?',
+      '',
+      'Rough estimates are fine.',
+    ].join('\n')
+
+    mockFetchSessionById.mockResolvedValue({
+      session: makeSession({ current_step: 'assessed' }),
+      messages: [
+        makeMessage({ id: 'msg-1', role: 'assistant', content: 'verdict: no-brainer\narc_alignment: strong\nkey_factors: x\nhard_req_status: all met', step: 'resume_loaded' }),
+        makeMessage({ id: 'msg-2', role: 'user', content: 'pursue', step: 'assessed' }),
+        makeMessage({ id: 'msg-3', role: 'assistant', content: "I'll rewrite your last two roles.", step: 'assessed' }),
+        makeMessage({ id: 'msg-4', role: 'user', content: 'scope confirmed', step: 'assessed' }),
+        makeMessage({ id: 'msg-5', role: 'assistant', content: turn1Text, step: 'assessed' }),
+      ],
+    })
+
+    const { result } = renderHook(() => useSession('sess-1'))
+    await waitFor(() => expect(result.current.sessionId).toBe('sess-1'))
+
+    expect(result.current.quantificationQuestions).toHaveLength(2)
+    expect(result.current.quantificationQuestions![0]).toEqual({
+      bullet: 'Built a data pipeline for daily ETL',
+      question: 'what was the data volume processed per day?',
+    })
+    expect(result.current.checkpoint).toBeNull()
+  })
+
+  it('does not restore quantificationQuestions when Turn 1 said no numbers needed', async () => {
+    const turn1Text = 'No numbers needed — your bullets already have strong metrics. Moving on to rewrites.'
+
+    mockFetchSessionById.mockResolvedValue({
+      session: makeSession({ current_step: 'assessed' }),
+      messages: [
+        makeMessage({ id: 'msg-1', role: 'assistant', content: 'verdict: no-brainer\narc_alignment: strong\nkey_factors: x\nhard_req_status: all met', step: 'resume_loaded' }),
+        makeMessage({ id: 'msg-2', role: 'user', content: 'pursue', step: 'assessed' }),
+        makeMessage({ id: 'msg-3', role: 'assistant', content: "I'll rewrite your last two roles.", step: 'assessed' }),
+        makeMessage({ id: 'msg-4', role: 'user', content: 'scope confirmed', step: 'assessed' }),
+        makeMessage({ id: 'msg-5', role: 'assistant', content: turn1Text, step: 'assessed' }),
+      ],
+    })
+
+    const { result } = renderHook(() => useSession('sess-1'))
+    await waitFor(() => expect(result.current.sessionId).toBe('sess-1'))
+
+    expect(result.current.quantificationQuestions).toBeNull()
+  })
+})
+
 describe('useSession — targeted session hydration', () => {
   beforeEach(() => {
     vi.clearAllMocks()
