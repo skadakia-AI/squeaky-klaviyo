@@ -1,4 +1,4 @@
-import type { ActiveSession, DashboardSession, StoredMessage } from './types'
+import type { ActiveSession, DashboardSession, StoredMessage, Resume, TargetingOutput } from './types'
 
 export async function fetchSessions(): Promise<DashboardSession[]> {
   try {
@@ -35,6 +35,16 @@ export async function fetchArtifact(sessionId: string, type: 'jd' | 'fit' | 'res
 export async function triggerExport(sessionId: string): Promise<{ downloadUrl: string } | null> {
   try {
     const res = await fetch(`/api/session/${sessionId}/export`, { method: 'POST' })
+    if (!res.ok) return null
+    return res.json()
+  } catch {
+    return null
+  }
+}
+
+export async function fetchTargetingData(sessionId: string): Promise<{ resume: Resume; targeting: TargetingOutput | null } | null> {
+  try {
+    const res = await fetch(`/api/session/${sessionId}/targeting`)
     if (!res.ok) return null
     return res.json()
   } catch {

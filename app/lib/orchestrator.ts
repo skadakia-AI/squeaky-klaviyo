@@ -37,7 +37,11 @@ export async function runOrchestrator(
 ): Promise<void> {
   const currentStep = (session.current_step as CurrentStep) ?? 'created'
 
-  await storeMessage(sessionId, 'user', message.content || message.file_name || '', currentStep)
+  await storeMessage(
+    sessionId, 'user',
+    message.type === 'file_upload' ? (message.file_name || 'Uploaded file') : (message.content || ''),
+    currentStep
+  )
 
   // ─── Intent classification gate ─────────────────────────────────────────────
   // File uploads and steps with unambiguous input skip classification.

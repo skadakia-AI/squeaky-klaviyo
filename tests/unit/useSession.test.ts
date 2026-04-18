@@ -8,10 +8,11 @@ import type { StoredMessage } from '../../app/lib/types'
 
 // vi.mock factories are hoisted above variable declarations, so mock fns must
 // be created with vi.hoisted() to be accessible inside the factory closures.
-const { mockReplace, mockPush, mockFetchSessionById, mockOpenStream } = vi.hoisted(() => ({
+const { mockReplace, mockPush, mockFetchSessionById, mockFetchTargetingData, mockOpenStream } = vi.hoisted(() => ({
   mockReplace: vi.fn(),
   mockPush: vi.fn(),
   mockFetchSessionById: vi.fn(),
+  mockFetchTargetingData: vi.fn(),
   mockOpenStream: vi.fn(),
 }))
 
@@ -21,6 +22,7 @@ vi.mock('next/navigation', () => ({
 
 vi.mock('../../app/lib/api', () => ({
   fetchSessionById: mockFetchSessionById,
+  fetchTargetingData: mockFetchTargetingData,
   getActiveSession: vi.fn().mockResolvedValue({ session: null, messages: [] }),
   fetchSessions: vi.fn().mockResolvedValue([]),
   fetchArtifact: vi.fn().mockResolvedValue(null),
@@ -101,6 +103,125 @@ describe('useSession — direct hydration', () => {
     renderHook(() => useSession('bad-id'))
 
     await waitFor(() => expect(mockReplace).toHaveBeenCalledWith('/'))
+  })
+})
+
+describe('useSession — checkpoint restoration on hydration', () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+    mockOpenStream.mockReturnValue(() => {})
+    mockFetchTargetingData.mockResolvedValue(null)
+  })
+
+  it('restores arc_confirmation checkpoint when resume_loaded session ends with assistant message', async () => {
+    mockFetchSessionById.mockResolvedValue({
+      session: makeSession({ current_step: 'resume_loaded' }),
+      messages: [
+        makeMessage({ role: 'assistant', content: 'Here is your career arc snapshot.', step: 'resume_loaded' }),
+      ],
+    })
+
+    const { result } = renderHook(() => useSession('sess-1'))
+    await waitFor(() => expect(result.current.sessionId).toBe('sess-1'))
+
+    expect(result.current.checkpoint).toBe('arc_confirmation')
+  })
+
+  it('does not set arc_confirmation when resume_loaded session has user message after arc snapshot', async () => {
+    mockFetchSessionById.mockResolvedValue({
+      session: makeSession({ current_step: 'resume_loaded' }),
+      messages: [
+        makeMessage({ id: 'msg-1', role: 'assistant', content: 'Here is your career arc snapshot.', step: 'resume_loaded' }),
+        makeMessage({ id: 'msg-2', role: 'user', content: 'Looks right — assess fit', step: 'resume_loaded' }),
+      ],
+    })
+
+    const { result } = renderHook(() => useSession('sess-1'))
+    await waitFor(() => expect(result.current.sessionId).toBe('sess-1'))
+
+    expect(result.current.checkpoint).toBeNull()
+  })
+
+  it('restores pursue_or_pass checkpoint when assessed session ends with a fit_assessment_card', async () => {
+    // A message containing a verdict block is promoted to fit_assessment_card by toMsg
+    const fitAssessmentContent = [
+      'Full assessment text here.',
+      'verdict: no-brainer',
+      'arc_alignment: strong',
+      'key_factors: 5+ years experience',
+      'hard_req_status: all met',
+    ].join('\n')
+
+    mockFetchSessionById.mockResolvedValue({
+      session: makeSession({ current_step: 'assessed' }),
+      messages: [makeMessage({ role: 'assistant', content: fitAssessmentContent, step: 'resume_loaded' })],
+    })
+
+    const { result } = renderHook(() => useSession('sess-1'))
+    await waitFor(() => expect(result.current.sessionId).toBe('sess-1'))
+
+    expect(result.current.checkpoint).toBe('pursue_or_pass')
+  })
+
+  it('restores scope_selection checkpoint when assessed session ends with scope proposal', async () => {
+    mockFetchSessionById.mockResolvedValue({
+      session: makeSession({ current_step: 'assessed' }),
+      messages: [
+        makeMessage({ id: 'msg-1', role: 'assistant', content: 'Here is your fit.', step: 'resume_loaded' }),
+        makeMessage({ id: 'msg-2', role: 'user', content: 'Pursue it.', step: 'assessed' }),
+        makeMessage({ id: 'msg-3', role: 'assistant', content: "I'll rewrite bullets for your last two roles.", step: 'assessed' }),
+      ],
+    })
+
+    const { result } = renderHook(() => useSession('sess-1'))
+    await waitFor(() => expect(result.current.sessionId).toBe('sess-1'))
+
+    expect(result.current.checkpoint).toBe('scope_selection')
+  })
+})
+
+describe('useSession — targeted session hydration', () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+    mockOpenStream.mockReturnValue(() => {})
+  })
+
+  it('sets showDiffView and loads targeting data for targeted sessions', async () => {
+    const mockTargeting = {
+      scope: ['r0'],
+      rewrites: [{ bullet_id: 'r0-b0', original: 'Built things', rewritten: 'Built scalable things' }],
+      flagged_for_removal: [],
+      out_of_scope_roles: [],
+    }
+    const mockResume = { name: 'Test User', experience: [], education: [] }
+
+    mockFetchSessionById.mockResolvedValue({
+      session: makeSession({ current_step: 'targeted' }),
+      messages: [],
+    })
+    mockFetchTargetingData.mockResolvedValue({ targeting: mockTargeting, resume: mockResume })
+
+    const { result } = renderHook(() => useSession('sess-1'))
+    await waitFor(() => expect(result.current.showDiffView).toBe(true))
+
+    expect(result.current.targetingData).toEqual(mockTargeting)
+    expect(result.current.resumeData).toEqual(mockResume)
+    expect(result.current.unreviewedCount).toBe(1)
+    expect(mockFetchTargetingData).toHaveBeenCalledWith('sess-1')
+  })
+
+  it('sets showDiffView but leaves targetingData null when targeting fetch fails', async () => {
+    mockFetchSessionById.mockResolvedValue({
+      session: makeSession({ current_step: 'targeted' }),
+      messages: [],
+    })
+    mockFetchTargetingData.mockResolvedValue(null)
+
+    const { result } = renderHook(() => useSession('sess-1'))
+    await waitFor(() => expect(result.current.sessionId).toBe('sess-1'))
+
+    expect(result.current.showDiffView).toBe(true)
+    expect(result.current.targetingData).toBeNull()
   })
 })
 

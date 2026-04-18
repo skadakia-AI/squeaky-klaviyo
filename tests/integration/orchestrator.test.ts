@@ -160,6 +160,21 @@ describe('created step', () => {
     )
   })
 
+  it('stores file_name (not base64 content) for file_upload messages', async () => {
+    vi.mocked(loadJD).mockResolvedValue({ success: true, rawText: 'Senior Engineer...' })
+    vi.mocked(runJDDecoder).mockResolvedValue({ success: true, decodedText: '# JD Decoded', roleTitle: 'SWE', company: 'Acme', slug: 'acme-swe' })
+
+    const { storeMessage } = await import('../../app/lib/utils/messages')
+    await run(
+      { type: 'file_upload', content: 'UEsDBBQABgAI...base64...', file_name: 'job-description.pdf', file_type: 'pdf' },
+      makeSession()
+    )
+
+    const userCall = vi.mocked(storeMessage).mock.calls.find(([, role]) => role === 'user')
+    expect(userCall?.[2]).toBe('job-description.pdf')
+    expect(userCall?.[2]).not.toContain('UEsDB')
+  })
+
   it('advances directly to decoded without stopping at jd_loaded', async () => {
     vi.mocked(loadJD).mockResolvedValue({ success: true, rawText: 'Software Engineer...' })
     vi.mocked(runJDDecoder).mockResolvedValue({ success: true, decodedText: '# JD Decoded', roleTitle: 'SWE', company: 'Acme', slug: 'acme-swe' })

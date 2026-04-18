@@ -13,7 +13,7 @@ import type {
   FitAssessmentData,
   Resume,
 } from './types'
-import { fetchSessionById, postReviews } from './api'
+import { fetchSessionById, fetchTargetingData, postReviews } from './api'
 import { openStream } from './sse'
 
 // Parses the machine-readable verdict block out of raw LLM output text.
@@ -178,17 +178,57 @@ export function useSession(initialSessionId: string | null = null) {
   // If null (lazy mode), wait for the user's first message to create one.
   useEffect(() => {
     if (!initialSessionId) return
-    fetchSessionById(initialSessionId).then(result => {
+
+    fetchSessionById(initialSessionId).then(async result => {
       if (!result) {
         router.replace('/')
         return
       }
+
       const { session, messages } = result
+      const mappedMessages = messages.map(toMsg)
+      const step = session.current_step
+
+      // Derive checkpoint from step + message history (mirrors applyDone logic)
+      let checkpoint: ClientState['checkpoint'] = null
+      if (step === 'resume_loaded') {
+        const lastMsg = mappedMessages[mappedMessages.length - 1]
+        if (lastMsg?.role === 'assistant') checkpoint = 'arc_confirmation'
+      } else if (step === 'assessed') {
+        const lastMsg = mappedMessages[mappedMessages.length - 1]
+        if (lastMsg?.type === 'fit_assessment_card') {
+          checkpoint = 'pursue_or_pass'
+        } else {
+          const lastAssistant = [...mappedMessages].reverse().find(m => m.role === 'assistant' && m.type === 'text')
+          if (lastAssistant?.content.includes("I'll rewrite")) checkpoint = 'scope_selection'
+        }
+      }
+
+      // For targeted sessions, fetch targeting JSON from storage to restore diff view
+      let showDiffView = false
+      let targetingData: ClientState['targetingData'] = null
+      let resumeData: ClientState['resumeData'] = null
+      let unreviewedCount = 0
+      if (step === 'targeted') {
+        showDiffView = true
+        const td = await fetchTargetingData(initialSessionId)
+        if (td) {
+          targetingData = td.targeting
+          resumeData = td.resume
+          unreviewedCount = (td.targeting?.rewrites?.length ?? 0) + (td.targeting?.flagged_for_removal?.length ?? 0)
+        }
+      }
+
       setState(prev => ({
         ...prev,
         sessionId: session.id,
-        currentStep: session.current_step,
-        messages: messages.map(toMsg),
+        currentStep: step,
+        messages: mappedMessages,
+        checkpoint,
+        showDiffView,
+        targetingData,
+        resumeData,
+        unreviewedCount,
         bulletReviews: session.bullet_reviews ?? {},
         bulletEdits: session.bullet_edits ?? {},
         excludedOutOfScopeRoles: session.excluded_out_of_scope_roles ?? [],
