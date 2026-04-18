@@ -45,3 +45,6 @@ next-env.d.ts
 
 # Local MCP config (contains secrets)
 .mcp.local.json
+
+# Product strategy (not for public repo)
+docs/product-vision.md
