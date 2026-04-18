@@ -10,6 +10,7 @@
 - [ ] **Langfuse tracing** — trace every Claude call for latency, token cost, inputs/outputs. Required for observability from day one.
 - [ ] **Confirm Supabase prod project** — verify real user data will land in a production Supabase instance, not a dev one.
 - [ ] **JD Decoded card cleanup** — reduce verbosity, improve scannability. First impression of the product's output quality.
+- [ ] **Funnel query before first user** — write and test the Supabase query that shows step completion rates (JD uploaded → decoded → resume uploaded → assessed → targeted → downloaded). North star: total docx downloads. Quality gate: download rate per completed workflow (exported / targeted sessions) + bullet accept rate. Run on day 2 and weekly after.
 
 ---
 
@@ -34,7 +35,7 @@
 ### Observability & Evals
 - [x] **Sentry** — error monitoring for unhandled exceptions in route + orchestrator.
 - [ ] **AI observability (Langfuse)** — trace every Claude call: latency, token cost, inputs/outputs per skill. Langfuse preferred over Helicone because it handles both tracing and evals in one tool, directly supporting the evals items below. Medium effort, high value.
-- [ ] **Product telemetry** — user behavior: step completion rates, drop-off points, session counts. Supabase events table already captures some events (decode_completed, verdict_delivered, resume_targeted) — extend and surface. Consider PostHog if a full analytics UI is wanted. Easy.
+- [ ] **Product telemetry** — funnel visibility via Supabase queries on the existing `sessions` table (step, timestamps, verdict, bullet_reviews). No separate events table or third-party tool needed yet. PostHog deferred until user volume justifies it. Key metrics: total docx downloads (north star), download rate per completed workflow (exported / targeted), bullet accept rate (quality gate: >40%), return sessions (retention), time JD upload → download (trust signal).
 - [ ] **AI evals for all skill agents** — structured criteria per skill output (jd-decoder, jd-match, resume-targeting), benchmark inputs, pass/fail scoring, regression tracking across prompt changes. Langfuse (above) is the recommended platform. Not "test until it feels right."
 - [ ] **Eval: orchestrator on bad input** — non-JD uploads, garbage text, out-of-order requests
 - [ ] **Eval: JD decoder output quality** — section counts, bullet length, tone
