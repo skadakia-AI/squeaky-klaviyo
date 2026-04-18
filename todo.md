@@ -9,7 +9,7 @@
 - [ ] **Summary + skills rewrites** — extend resume-targeting to rewrite summary and skills sections (not just bullets). Schema → prompt → diff view → export.
 - [ ] **Langfuse tracing** — trace every Claude call for latency, token cost, inputs/outputs. Required for observability from day one.
 - [ ] **Confirm Supabase prod project** — verify real user data will land in a production Supabase instance, not a dev one.
-- [ ] **JD Decoded card cleanup** — reduce verbosity, improve scannability. First impression of the product's output quality.
+- [x] **JD Decoded card cleanup** — reduce verbosity, improve scannability. First impression of the product's output quality.
 - [ ] **Funnel query before first user** — write and test the Supabase query that shows step completion rates (JD uploaded → decoded → resume uploaded → assessed → targeted → downloaded). North star: total docx downloads. Quality gate: download rate per completed workflow (exported / targeted sessions) + bullet accept rate. Run on day 2 and weekly after.
 
 ---
@@ -103,3 +103,4 @@
 - [x] JDDecodeCard upload prompt footer is conditional — hides once user moves past `decoded` step
 - [x] Sentry error monitoring and session replay
 - [x] Dashboard — session list with status, fit, next step, artifact drawer (Decoded JD / Fit / Tailored Resume), remove, download; lazy session creation via /session/new; /session/[id] routing; useSession tests
+- [x] Session hydration fixes — checkpoint restoration, targeting diff view, base64 display bug; routing bug fix (window.history.replaceState instead of router.replace to avoid wiping SSE state mid-stream)
