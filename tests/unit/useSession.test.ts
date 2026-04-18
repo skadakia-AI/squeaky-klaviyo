@@ -230,7 +230,9 @@ describe('useSession — lazy creation URL replacement', () => {
     vi.clearAllMocks()
   })
 
-  it('replaces URL with real session ID after session_created fires in lazy mode', async () => {
+  it('updates URL via history.replaceState (not router.replace) after session_created in lazy mode', async () => {
+    const replaceState = vi.spyOn(window.history, 'replaceState')
+
     mockOpenStream.mockImplementation(
       (_msg: unknown, _sessionId: unknown, onEvent: (e: unknown) => void) => {
         setTimeout(() => {
@@ -247,8 +249,9 @@ describe('useSession — lazy creation URL replacement', () => {
       result.current.sendMessage({ type: 'text', content: 'here is a job description' })
     })
 
-    await waitFor(() => expect(mockReplace).toHaveBeenCalledWith('/session/new-sess-abc'))
+    await waitFor(() => expect(replaceState).toHaveBeenCalledWith(null, '', '/session/new-sess-abc'))
     expect(result.current.sessionId).toBe('new-sess-abc')
+    expect(mockReplace).not.toHaveBeenCalled()
   })
 
   it('does not replace URL after session_created when session was loaded by ID', async () => {

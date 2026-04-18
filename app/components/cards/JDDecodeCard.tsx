@@ -18,48 +18,48 @@ export default function JDDecodeCard({ content, showUploadPrompt }: JDDecodeCard
         Role Decoded
       </div>
 
-      <div className="px-4 py-3 text-sm" style={{ color: '#374151' }}>
+      <div className="px-5 py-4 text-sm" style={{ color: '#374151' }}>
         <ReactMarkdown
           components={{
             h1: ({ children }) => (
-              <h1 style={{ fontSize: '0.9375rem', fontWeight: 700, marginBottom: '0.5rem', color: '#111827' }}>
+              <h1 style={{ fontSize: '0.9375rem', fontWeight: 700, marginBottom: '0.75rem', color: '#111827' }}>
                 {children}
               </h1>
             ),
             h2: ({ children }) => (
-              <h2 style={{ fontSize: '0.75rem', fontWeight: 600, marginTop: '1rem', marginBottom: '0.3rem', color: '#6B7280', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+              <h2 style={{ fontSize: '0.6875rem', fontWeight: 600, marginTop: '1.75rem', marginBottom: '0.5rem', paddingBottom: '0.3rem', borderBottom: '1px solid #F3F4F6', color: '#6B7280', textTransform: 'uppercase', letterSpacing: '0.07em' }}>
                 {children}
               </h2>
             ),
             h3: ({ children }) => (
-              <h3 style={{ fontSize: '0.8125rem', fontWeight: 600, marginTop: '0.5rem', marginBottom: '0.125rem', color: '#374151' }}>
+              <h3 style={{ fontSize: '0.8125rem', fontWeight: 600, marginTop: '0.75rem', marginBottom: '0.2rem', color: '#374151' }}>
                 {children}
               </h3>
             ),
             p: ({ children }) => (
-              <p style={{ marginBottom: '0.4rem', fontSize: '0.8125rem', lineHeight: '1.5' }}>
+              <p style={{ marginBottom: '0.5rem', fontSize: '0.8125rem', lineHeight: '1.6' }}>
                 {children}
               </p>
             ),
             ul: ({ children }) => (
-              <ul style={{ listStyle: 'none', padding: 0, marginBottom: '0.4rem' }}>
+              <ul style={{ listStyle: 'none', padding: 0, marginBottom: '0.5rem' }}>
                 {children}
               </ul>
             ),
             ol: ({ children }) => (
-              <ol style={{ listStyleType: 'decimal', paddingLeft: '1.25rem', marginBottom: '0.4rem' }}>
+              <ol style={{ listStyleType: 'decimal', paddingLeft: '1.25rem', marginBottom: '0.5rem' }}>
                 {children}
               </ol>
             ),
             li: ({ children }) => (
-              <li style={{ display: 'flex', alignItems: 'flex-start', gap: '0.5rem', marginBottom: '0.3rem', fontSize: '0.8125rem', lineHeight: '1.5' }}>
-                <span style={{ width: 5, height: 5, borderRadius: '50%', backgroundColor: '#D1D5DB', flexShrink: 0, marginTop: '0.45rem' }} />
+              <li style={{ display: 'flex', alignItems: 'flex-start', gap: '0.5rem', marginBottom: '0.35rem', fontSize: '0.8125rem', lineHeight: '1.6' }}>
+                <span style={{ width: 5, height: 5, borderRadius: '50%', backgroundColor: '#D1D5DB', flexShrink: 0, marginTop: '0.5rem' }} />
                 <span>{children}</span>
               </li>
             ),
             strong: ({ children }) => <strong style={{ fontWeight: 600, color: '#111827' }}>{children}</strong>,
             em: ({ children }) => <em style={{ fontStyle: 'italic' }}>{children}</em>,
-            hr: () => <hr style={{ margin: '0.5rem 0', opacity: 0.15 }} />,
+            hr: () => null,
           }}
         >
           {content}

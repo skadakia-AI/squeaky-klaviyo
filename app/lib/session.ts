@@ -243,9 +243,10 @@ export function useSession(initialSessionId: string | null = null) {
     switch (event.type) {
       case 'session_created':
         setState(prev => ({ ...prev, sessionId: event.session_id }))
-        // In lazy mode (/session/new), update the URL to the real session ID
+        // In lazy mode (/session/new), update the URL without triggering React re-navigation.
+        // router.replace() causes the hydration effect to re-run mid-stream, wiping state.
         if (!initialSessionId) {
-          router.replace(`/session/${event.session_id}`)
+          window.history.replaceState(null, '', `/session/${event.session_id}`)
         }
         break
 

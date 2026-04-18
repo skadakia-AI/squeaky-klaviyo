@@ -25,25 +25,25 @@ Every section must render as exactly 3–4 bullet points. Each bullet is one sen
 
 ## Sections to produce
 
-### 1. Business Context
+### 1. Context
 
 Open with 1 sentence on what the company does and how they make money in the context of this role. Then 2–3 crisp bullets on **what triggered this hire** — what caused the need for this role? Ground each bullet in specific JD signals.
 
 ---
 
-### 2. Hiring Manager Incentives
+### 2. What's at stake for the hiring manager
 
 2–4 bullets: **What makes the HM a hero if this hire works out — and what's the risk if it doesn't?** What metric or org win is the HM measured on? What is the cost if this role fails or stays unfilled? Mark what is `[inferred]`.
 
 ---
 
-### 3. Business Objectives for the Role
+### 3. Outcomes you'd own
 
 1–3 outcome-oriented statements: **What does this role need to achieve?** Not tasks — business outcomes testable at 12 months. Format: *"[Action verb] [outcome] so that [business impact]."*
 
 ---
 
-### 4. The "Customer" or Stakeholder
+### 4. Who you're really working for
 
 **Who does the work of this role actually benefit — and what do they need?**
 
@@ -58,7 +58,7 @@ Close with a **Commercial Impact** sentence: trace the chain from this role's de
 
 ---
 
-### 5. Core Problems
+### 5. The problems you'd be walking into
 
 2–3 labeled problem buckets explaining *why* the objectives above haven't been achieved yet. For each:
 - Clear label (e.g., "Fragmented Systems," "Scaling Gap")
@@ -69,13 +69,13 @@ Close with 1 sentence on whether these problems are independent or cascading.
 
 ---
 
-### 6. Current State & Status Quo
+### 6. What's broken today
 
 **What are they doing today, and why isn't it enough?** Name tools, systems, processes, and team structures from the JD. Identify the core gap. Flag `[stated]` vs. `[inferred]`.
 
 ---
 
-### 7. Success Criteria
+### 7. What 'success' looks like
 
 Translate vague JD language into concrete, observable outcomes:
 - **Near-term (30–90 days):** what does getting started well look like?
@@ -85,7 +85,7 @@ Quantify where possible. Flag `[inferred]`.
 
 ---
 
-### 8. Operating Context — Levers & Constraints
+### 8. The operating reality
 
 For each dimension below, write 1 sentence: what the candidate controls, what limits or complicates it, and what operating effectively looks like in practice. No bullet lists within each dimension. No "you'll thrive if" framing.
 
@@ -98,7 +98,7 @@ Cover at minimum (add others clearly implied by the JD):
 
 ---
 
-### 9. Foreseeable Gaps — What the JD Likely Missed
+### 9. Reading between the lines
 
 1–3 skills, dynamics, or realities the JD is missing or underweighting. For each: name it, explain why it's likely absent, and note how a candidate could proactively surface it.
 
@@ -132,34 +132,34 @@ Return the full analysis as structured markdown:
 ## Summary
 [3-sentence synthesis: what the role is really about, what the HM is buying, and what makes someone the obvious hire.]
 
-## 1. Business Context
+## 1. Context
 [content]
 
-## 2. Hiring Manager Incentives
+## 2. What's at stake for the hiring manager
 [content]
 
-## 3. Business Objectives for the Role
+## 3. Outcomes you'd own
 [content]
 
-## 4. The "Customer" or Stakeholder
+## 4. Who you're really working for
 [content]
 
-## 5. Core Problem Clusters
+## 5. The problems you'd be walking into
 [content]
 
-## 6. Current State & Status Quo
+## 6. What's broken today
 [content]
 
-## 7. Success Criteria
+## 7. What 'success' looks like
 [content]
 
-## 8. Operating Context — Levers & Constraints
+## 8. The operating reality
 [content]
 
-## 9. Foreseeable Gaps
+## 9. Reading between the lines
 [content]
 
-## 10. Hard vs. Soft Requirements
+## 10. Requirements
 [content]
 
 ## 11. The No-Brainer Hire
