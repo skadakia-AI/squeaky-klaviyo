@@ -3,9 +3,9 @@
 ## Launch Checklist (ship these first)
 
 - [ ] **Clerk production mode** — flip Clerk to prod in dashboard, update env vars. No code changes.
-- [ ] **App landing + empty state** — new user signs in and sees a clear starting point, not a blank screen. Minimum viable onboarding.
+- [x] **App landing + empty state** — new user signs in and sees a clear starting point, not a blank screen. Minimum viable onboarding.
 - [ ] **Per-user rate cap** — soft daily session limit via Supabase query. Cost protection before Stripe is in.
-- [ ] **Dashboard / pipeline view** — per-opportunity cards: company, title, fit verdict, step progress, download link. Backend state exists; display layer is the work.
+- [x] **Dashboard / pipeline view** — per-opportunity cards: company, title, fit verdict, step progress, download link. Backend state exists; display layer is the work.
 - [ ] **Summary + skills rewrites** — extend resume-targeting to rewrite summary and skills sections (not just bullets). Schema → prompt → diff view → export.
 - [ ] **Langfuse tracing** — trace every Claude call for latency, token cost, inputs/outputs. Required for observability from day one.
 - [ ] **Confirm Supabase prod project** — verify real user data will land in a production Supabase instance, not a dev one.
@@ -20,7 +20,7 @@
 - [ ] **Workspace design** — define what the user's workspace should look and feel like: navigation, save/revisit JD decode and fit assessment, overall information architecture. *Scope this before building.*
 - [ ] **App landing page & onboarding** — app entry point for new users: value prop, sign-in/up, empty state, first-use guidance. Distinct from the marketing landing page.
 - [ ] **User onboarding flow** — guide new users through first session: what to paste, what to expect at each step, why it matters.
-- [ ] **Dashboard / pipeline view** — per-opportunity cards: company, title, fit verdict, step progress, download resume. Backend state and data already exist; display layer is the work. *Simpler than it looks.*
+- [x] **Dashboard / pipeline view** — per-opportunity cards: company, title, fit verdict, step progress, download resume. Backend state and data already exist; display layer is the work. *Simpler than it looks.*
 - [ ] **Resume reuse across sessions** — if user has a prior resume, confirm which to use instead of always asking for a fresh upload. *Scoping is the hard part: per-user storage? most-recent session? explicit resume library?*
 - [ ] **Stripe integration** — paywall for usage beyond a free tier. Decide on model (per-session, subscription, seat) before building.
 
@@ -101,3 +101,4 @@
 - [x] Error handler strips stale progress messages on failure
 - [x] JDDecodeCard upload prompt footer is conditional — hides once user moves past `decoded` step
 - [x] Sentry error monitoring and session replay
+- [x] Dashboard — session list with status, fit, next step, artifact drawer (Decoded JD / Fit / Tailored Resume), remove, download; lazy session creation via /session/new; /session/[id] routing; useSession tests
