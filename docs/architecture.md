@@ -241,8 +241,6 @@ Server-Sent Events (SSE) are used both for progress updates and token-by-token s
 | `session_created` | Store sessionId in client state |
 | `token` | Append token to current assistant bubble (streaming calls) |
 | `message` (assistant) | Render complete text into assistant bubble (non-streaming + short orchestrator messages) |
-| `step_complete: jd_loaded` | Show JD preview. Show Checkpoint 0 buttons (Looks right / Re-enter). Hide input. |
-| `step_complete: jd_confirmed` | Hide Checkpoint 0 buttons. Show progress: *"Decoding the role..."* SSE-only — not persisted to `current_step`. |
 | `step_complete: decoded` | Render JDDecodeCard. Show resume input prompt. Re-enable input. |
 | `step_complete: resume_loaded` | Progress update |
 | `step_complete: assessed` | Render FitAssessmentCard with pursue/pass buttons |

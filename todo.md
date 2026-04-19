@@ -2,9 +2,11 @@
 
 ## Launch Checklist (ship these first)
 
+- [ ] **Anthropic Tier 2 upgrade** — deposit $40 in the Anthropic console before any real users arrive. Tier 1 caps at $100/month spend and 8k OTPM; a burst of 5-6 simultaneous users will generate 429s and hard-fail sessions. Tier 2 is 11x the output capacity ($500/month ceiling).
 - [ ] **Clerk production mode** — flip Clerk to prod in dashboard, update env vars. No code changes.
 - [x] **App landing + empty state** — new user signs in and sees a clear starting point, not a blank screen. Minimum viable onboarding.
-- [ ] **Per-user rate cap** — soft daily session limit via Supabase query. Cost protection before Stripe is in.
+- [ ] **Per-user rate cap** — soft daily session limit via Supabase query. Cost protection before Stripe is in. At ~$0.20/session on Sonnet 4.6, Tier 2's $500/month ceiling = ~2,500 sessions/month total.
+- [ ] **429 retry with backoff** — orchestrator currently hard-fails on 429 with no retry. At launch with concurrent users this will surface as silent errors mid-flow. Read the `retry-after` response header and retry once before failing.
 - [x] **Dashboard / pipeline view** — per-opportunity cards: company, title, fit verdict, step progress, download link. Backend state exists; display layer is the work.
 - [ ] **Summary + skills rewrites** — extend resume-targeting to rewrite summary and skills sections (not just bullets). Schema → prompt → diff view → export.
 - [ ] **Langfuse tracing** — trace every Claude call for latency, token cost, inputs/outputs. Required for observability from day one.
@@ -15,6 +17,29 @@
 ---
 
 ## In Progress / Next Up
+
+### UX Polish — Design Gaps (from design review)
+
+**Ship-blocking:**
+- [ ] **Textarea for JD input** — `InputArea` uses `type="text"` (single-line). Pasting a 500-word job description scrolls horizontally and looks broken. Replace with an auto-resizing `textarea`.
+- [ ] **Progress animation on loading states** — `ProgressUpdate` renders static text during 30-60s Claude calls. Looks frozen. Add an animated ellipsis or pulse so users know something is happening.
+- [ ] **Explain the blocked download button** — Download is `disabled` with only a `title` tooltip explaining why. Users click it, nothing happens, they assume the product is broken. Replace the disabled button with an active "Review [N] remaining →" that scrolls to the first unreviewed bullet, or add visible inline text: "Review all bullets above to unlock."
+
+**High priority:**
+- [ ] **Back to dashboard in session view** — no escape from a session except clicking the logo (not a discoverable nav pattern). Add "← My Applications" link to the session header.
+- [ ] **Jargon audit: arc, targeting, scope, session** — "arc snapshot", "resume targeting", "adjust scope", "start a new session" are internal product terms. Map each to consumer language: "career summary", "resume rewrites", "include different roles", "add another role".
+- [ ] **Explain accept/reject before users hit it** — the diff view requires reviewing every bullet to unlock download, with no explanation of what accepting/rejecting does. Add a one-line explainer at the top and an "Accept all" shortcut for users who trust the rewrites.
+- [ ] **Arc confirmation framing** — "Looks right — assess fit" / "Make a correction" gives users no context for what they're confirming or what comes next. Rename to consumer language and signal what's about to happen.
+
+**Medium priority:**
+- [ ] **File upload discoverability** — upload button is an unlabeled SVG icon with only a `title` tooltip. Add a text label or use a pill button that reads "Upload PDF" at the `decoded` step where file upload is the primary action.
+- [ ] **"Adjust scope" gives no direction** — clicking it clears the checkpoint and shows a blank input with "Type your response...". Set a directive placeholder: "Name any other roles you'd like me to include..." when this state is active.
+- [ ] **Edit affordance in diff view** — the pencil edit button is 12×12px with no label; click-to-edit on bullet text has no visual cue. Add a visible "Edit" text link or underline hint on the rewritten text.
+- [ ] **Button copy consistency** — `FitAssessmentCard` says "Tailor my resume"; `CheckpointButtons` (pursue_or_pass) says "Target my resume". Same action, two labels. Standardise to "Tailor my resume" everywhere.
+- [ ] **Terminal state copy** — "Start a new session" is developer language. Replace bottom bar with two options: "← Back to pipeline" (primary) and "Add another role" (secondary).
+- [ ] **Step/progress indicator** — users have no idea how many steps remain or where they are in the flow. Add a minimal indicator (dots or "Step 2 of 4") in the header during active sessions.
+
+---
 
 ### UX Polish
 - [ ] **User navigation** — navigating between stages of the flow (dashboard → active session → step progress) and revisiting earlier outputs (decoded JD, fit assessment) without losing state. Requires workspace design decision first.
@@ -27,7 +52,9 @@
 
 ### Skill Improvements
 - [ ] **Non-bullet resume sections** — targeting should also rewrite the summary, skills, and projects sections (not just experience bullets). Requires schema changes (types.ts), skill prompt additions, diff view extensions. *Schema design is the gating work.*
-- [ ] **Resume formatting fidelity** — downloaded .docx should match the original uploaded resume as closely as possible: fonts, margins, section spacing, header style. Currently export uses a generic template. Requires reading and replicating the source document's formatting.
+- [ ] **Resume formatting fidelity** — downloaded .docx should match the original uploaded resume as closely as possible: fonts, margins, section spacing, header style. Currently export uses a generic template. Requires reading and replicating the source document's formatting. *See also: Growth & Delight — this is a pre-pricing gate.*
+- [ ] **JD Decoder: surface the non-obvious insight** — the decode should lead with what the role is *really* about: org signals, buried priorities, subtext that a seasoned recruiter would catch. Currently it reformats; it needs to reveal. Prompt change in `jd-decoder.md`, no code changes. This is the moment users decide whether the product is smart or just a formatter. *Consider for launch.*
+- [ ] **Diff view: surface the "why" behind each rewrite** — the `objective` field already exists per bullet but renders as a small tag. Promote it to a one-line callout explaining the improvement: "Added outcome framing, aligned to their 'data-driven' language." Makes the AI's reasoning legible and turns a functional UI into a moment of feeling understood.
 - [ ] **JD Decoder tone** — make output spikier and more opinionated (voice/tone pass on skill prompt)
 - [ ] **JD Decoder section enforcement** — hard limit on section output counts not being respected; needs per-section enforcement
 - [ ] **Progressive JD disclosure** — surface the right decoded intel at the right step (business context + no-brainer hire upfront; requirements for fit; targeting signals for rewrite) rather than dumping everything at once
@@ -56,6 +83,10 @@
 
 ## Downstream (post-core)
 
+### Growth & Delight
+- [ ] **Shareable fit verdict card** — a public URL + OG image for the fit assessment result ("No-brainer hire for [Role] at [Company]"). Job searching is private suffering; this makes one moment positive and public. Likely the highest-leverage acquisition feature in the product — do this before any paid marketing spend. Requires a public route, a read-only session share token, and a card render endpoint.
+- [ ] **Resume formatting fidelity (pre-pricing gate)** — the downloaded .docx is the product's closing argument. If it looks generic, all the upstream intelligence feels wasted. Nail the formatting before putting a price on the product. Hard engineering problem (mammoth + docx template matching) but directly determines willingness to pay.
+
 ### New Skills
 - [ ] Interview question identification — surface likely questions based on role + fit gap
 - [ ] Proof of capability artifact — generate a tailored leave-behind for the hiring manager
@@ -68,6 +99,28 @@
 - [ ] **Dynamic routing / sub-agent spawning** — replace forced linear state machine with an orchestrator that can dynamically route to skills, tools, or sub-agents based on context
 - [ ] Cancel mid-stream — pause/abort a response
 - [ ] Full end-to-end tests (Playwright) — deferred until core flow is stable
+
+---
+
+## Consumer-Grade Polish (post-launch, not MVP gating)
+
+### Reliability
+- [ ] **Better error UX** — "Something went wrong" is not consumer-grade. Each error code should map to a human-readable, actionable message (e.g., "We couldn't fetch that URL — try pasting the job description as text instead").
+- [ ] **Stuck-state recovery audit** — walk every possible mid-flow failure (PDF parse hang, Supabase Storage 503, Anthropic timeout) and verify the user has a clear path forward. Quantification panel hydration was one; there may be others.
+- [ ] **Session abandonment cleanup** — orphaned sessions leave PDFs and structured JSON sitting in Supabase Storage indefinitely. Add a scheduled cleanup for sessions abandoned >30 days with no export.
+
+### UX & Access
+- [ ] **Mobile responsiveness** — fixed-position panels (QuantificationPanel, DiffView) are almost certainly broken on small viewports. Test and fix layout on mobile before any public-facing promotion.
+- [ ] **Accessibility** — keyboard navigation, focus management, screen reader labels. Not blocking for MVP but required before any meaningful user volume.
+- [ ] **File size limits enforced client-side** — currently only validated server-side. Add client-side check before upload to give instant feedback instead of a mid-upload error.
+
+### Trust & Privacy
+- [ ] **Data retention policy** — resumes are sitting in Supabase Storage with no deletion flow. Users need a way to delete their data, and there should be a stated retention policy before any public launch.
+- [ ] **Privacy policy** — required before storing any real user data at consumer scale. Covers resume storage, Anthropic API data handling, Clerk auth data.
+
+### Cost & Operations
+- [ ] **Spend alerting** — set a Anthropic console spend alert at 80% of the monthly ceiling so you're not surprised by a cutoff mid-month.
+- [ ] **Cost monitoring per user** — track Anthropic spend per `user_id` in the `sessions` table (token counts already available in API responses). Needed to identify abuse and inform pricing decisions.
 
 ---
 

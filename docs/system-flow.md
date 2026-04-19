@@ -40,6 +40,7 @@ This is a JavaScript object in RAM in the user's browser tab. It contains:
 | `resumeData` | The structured resume for the diff view |
 | `bulletReviews` | Accept/reject decisions the user has made. For rewrite bullets: `true` = accept rewrite, `false` = keep original. For removal bullets: `true` = remove from export, `false` = keep. Editing a bullet auto-sets its review to `true`. |
 | `bulletEdits` | Manual edits the user has made to rewritten bullets. Edit takes priority over the AI rewrite; explicit rejection still overrides an edit. Resolution order: rejected → original; edited → edit; accepted → rewrite; else → original. |
+| `quantificationQuestions` | Structured question pairs emitted by the `quantification_needed` SSE event when Turn 1 asks for numbers. Drives the `QuantificationPanel` overlay. Restored from the stored Turn 1 message on session hydration if the user left before submitting answers. |
 | `unreviewedCount` | Number of bullets still requiring a decision. Initialized as `rewrites.length + flagged_for_removal.length`. Decremented when a bullet is accepted, rejected, or edited for the first time. Download is gated on this reaching zero. |
 | `excludedOutOfScopeRoles` | Role IDs the user has opted to exclude from the export. Out-of-scope roles are exported with header only (company, title, dates) when excluded; bullets are hidden in the diff view and stripped from the docx. Default: empty (all bullets included). |
 | `error` | The current error state, if any |
@@ -343,7 +344,7 @@ created
 
 The `resume_loaded` step involves an arc snapshot confirmation loop. The user may make corrections (returning to Turn 1) any number of times before confirming. Only the "Looks right — assess fit" checkpoint button triggers Turn 2 and advances to `assessed`.
 
-The `assessed` step has internal sub-states that are not tracked in the database — they're inferred from message history. The orchestrator detects which sub-state it's in by counting stored messages for the `assessed` step.
+The `assessed` step has internal sub-states that are not tracked in the database — they're inferred from message history. The orchestrator detects which sub-state it's in by content-matching stored assistant messages for the `assessed` step via `hasTurn1Complete()`, which checks for the controlled phrases `"Before I rewrite"` (quantification requested) and `"No numbers needed"` (proceed directly to Turn 2). Message count alone is not reliable because chat responses can be stored under the same step.
 
 ---
 
@@ -374,6 +375,14 @@ The connection uses `fetch` + `ReadableStream`, not `EventSource`. This is requi
 
 ## Session Recovery
 
-When the app loads, `useSession` calls `getActiveSession()` which hits `/api/session/active`. This endpoint looks up the authenticated user's most recent in-progress session and returns the session record plus its full message history.
+Session recovery happens via direct URL navigation, not on app load. The dashboard lists all sessions with a "Continue" button per in-progress session. Clicking it routes to `/session/{id}`.
 
-If an in-progress session is found, the UI shows a recovery prompt: "You were working on [role] at [company]. Continue where you left off?" If the user confirms, `continueSession()` is called, which populates `ClientState` from the returned data — messages are reconstructed as `type: 'text'` (card types are not persisted; the recovery path renders plain text). The session can then resume from the last persisted step.
+When `AppLayout` renders with a session ID, it passes it to `useSession(initialSessionId)`. The hook fires a `useEffect` that calls `fetchSessionById(id)`, which returns the session record and its full message history from Supabase.
+
+The hook then reconstructs `ClientState` from that data:
+- Messages are mapped through `toMsg()`, which promotes any message containing a verdict block to `fit_assessment_card` type. All other messages render as `type: 'text'`.
+- Checkpoints are inferred from step + message content: `arc_confirmation` if the last message in a `resume_loaded` session is from the assistant; `pursue_or_pass` if the last message is a fit assessment card; `scope_selection` if the last assistant message includes `"I'll rewrite"`.
+- If the session is at `assessed` and the last assistant message in that step contains `"Before I rewrite"` (Turn 1 asked for numbers but the user left before submitting), `quantificationQuestions` is restored by parsing the stored Turn 1 message — the `QuantificationPanel` re-appears without a new Claude call.
+- For `targeted` sessions, `targetingData` and `resumeData` are fetched separately from Supabase Storage and the diff view is restored.
+
+If the session ID is not found, the hook redirects to `/`.
