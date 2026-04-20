@@ -360,7 +360,11 @@ async function runTurn2(
 ) {
   emit({ type: 'message', role: 'assistant', content: 'Rewriting bullets...', progress: true })
 
-  const turn2Result = await runResumeTargetingTurn2(sessionId, userId)
+  // Run Turn 2 and summary rewrite in parallel — no shared inputs or outputs.
+  const [turn2Result, summaryResult] = await Promise.all([
+    runResumeTargetingTurn2(sessionId, userId),
+    runSummaryRewrite(sessionId, userId),
+  ])
 
   if (!turn2Result.success) {
     emit({ type: 'error', code: turn2Result.code, message: turn2Result.message })
@@ -368,7 +372,6 @@ async function runTurn2(
   }
 
   // Summary rewrite is non-blocking — proceed without it if it fails.
-  const summaryResult = await runSummaryRewrite(sessionId, userId)
   const summaryRewrite: SummaryRewrite | null = summaryResult.success
     ? { original: summaryResult.original, rewritten: summaryResult.rewritten }
     : null
