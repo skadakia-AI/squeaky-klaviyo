@@ -46,12 +46,18 @@ export interface Section {
 
 // ─── Targeting output ─────────────────────────────────────────────────────────
 
+export interface SummaryRewrite {
+  original: string | null
+  rewritten: string
+}
+
 export interface TargetingOutput {
   role: string
   scope: string[]
   rewrites: TargetingRewrite[]
   flagged_for_removal: TargetingRemoval[]
   credibility_check: CredibilityCheck
+  summary_rewrite?: SummaryRewrite
 }
 
 export interface TargetingRewrite {
@@ -122,6 +128,8 @@ export interface ActiveSession {
   bullet_reviews?: Record<string, boolean>
   bullet_edits?: Record<string, string>
   excluded_out_of_scope_roles?: string[]
+  summary_accepted?: boolean | null
+  summary_edit?: string | null
 }
 
 export interface StoredMessage {
@@ -233,5 +241,7 @@ export interface ClientState {
   unreviewedCount: number
   excludedOutOfScopeRoles: string[]
   quantificationQuestions: QuantificationQuestion[] | null
+  summaryReview: boolean | undefined
+  summaryEdit: string | undefined
   error: { code: string; message: string } | null
 }

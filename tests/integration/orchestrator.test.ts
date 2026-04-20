@@ -7,6 +7,10 @@ import type { Resume } from '../../app/lib/types'
 
 vi.mock('../../app/lib/supabase', () => ({ getServiceClient: vi.fn() }))
 
+vi.mock('../../app/lib/skills/summary-rewrite', () => ({
+  runSummaryRewrite: vi.fn().mockResolvedValue({ success: true, original: null, rewritten: 'Rewritten summary.' }),
+}))
+
 vi.mock('../../app/lib/utils/messages', () => ({
   storeMessage: vi.fn().mockResolvedValue(undefined),
   fetchMessages: vi.fn().mockResolvedValue([]),

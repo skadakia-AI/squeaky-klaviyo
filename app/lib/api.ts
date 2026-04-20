@@ -1,4 +1,4 @@
-import type { ActiveSession, DashboardSession, StoredMessage, Resume, TargetingOutput } from './types'
+import type { ActiveSession, DashboardSession, StoredMessage, Resume, TargetingOutput, SummaryRewrite } from './types'
 
 export async function fetchSessions(): Promise<DashboardSession[]> {
   try {
@@ -42,7 +42,7 @@ export async function triggerExport(sessionId: string): Promise<{ downloadUrl: s
   }
 }
 
-export async function fetchTargetingData(sessionId: string): Promise<{ resume: Resume; targeting: TargetingOutput | null } | null> {
+export async function fetchTargetingData(sessionId: string): Promise<{ resume: Resume; targeting: TargetingOutput | null; summaryRewrite: SummaryRewrite | null } | null> {
   try {
     const res = await fetch(`/api/session/${sessionId}/targeting`)
     if (!res.ok) return null
@@ -75,7 +75,9 @@ export async function postReviews(
   sessionId: string,
   bulletReviews: Record<string, boolean>,
   bulletEdits: Record<string, string>,
-  excludedOutOfScopeRoles: string[]
+  excludedOutOfScopeRoles: string[],
+  summaryAccepted?: boolean,
+  summaryEdit?: string
 ): Promise<{ success: boolean }> {
   try {
     const accepted = Object.values(bulletReviews).filter(Boolean).length
@@ -88,6 +90,8 @@ export async function postReviews(
         bullet_edits: bulletEdits,
         bullets_accepted: accepted,
         excluded_out_of_scope_roles: excludedOutOfScopeRoles,
+        summary_accepted: summaryAccepted,
+        summary_edit: summaryEdit ?? null,
       }),
     })
     if (!res.ok) return { success: false }

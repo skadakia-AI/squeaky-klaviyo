@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { applyStepComplete, applyDone, parseVerdictFromText } from '../../app/lib/session'
+import { applyStepComplete, applyDone, parseVerdictFromText, buildTargetedViewState } from '../../app/lib/session'
 import type { ClientState, ChatMessage, CurrentStep } from '../../app/lib/types'
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -19,6 +19,8 @@ function buildState(overrides: Partial<ClientState> = {}): ClientState {
     unreviewedCount: 0,
     excludedOutOfScopeRoles: [],
     quantificationQuestions: null,
+    summaryReview: undefined,
+    summaryEdit: undefined,
     error: null,
     ...overrides,
   }
@@ -168,6 +170,56 @@ describe('not_pursuing', () => {
   })
 })
 
+// ─── buildTargetedViewState ───────────────────────────────────────────────────
+
+describe('buildTargetedViewState', () => {
+  const targeting = {
+    role: 'SWE',
+    scope: ['r0'],
+    rewrites: [
+      { bullet_id: 'r0-b0', original: 'a', rewritten: 'b', objective: 'x', structure: 'CAR', unquantified: false },
+      { bullet_id: 'r0-b1', original: 'c', rewritten: 'd', objective: 'x', structure: 'CAR', unquantified: false },
+    ],
+    flagged_for_removal: [{ bullet_id: 'r0-b2', original: 'e', reason: 'weak' }],
+    credibility_check: { throughline: 'strong', notes: '' },
+  }
+  const summaryRewrite = { original: 'Old', rewritten: 'New' }
+  const resume = { name: 'Test', experience: [], education: [] }
+
+  it('totalReviewable counts rewrites + removals + summary', () => {
+    const vs = buildTargetedViewState(targeting, summaryRewrite, resume)
+    expect(vs.totalReviewable).toBe(4) // 2 + 1 + 1
+  })
+
+  it('totalReviewable excludes summary when summaryRewrite is null', () => {
+    const vs = buildTargetedViewState(targeting, null, resume)
+    expect(vs.totalReviewable).toBe(3) // 2 + 1
+  })
+
+  it('hasSummaryRewrite is true when summaryRewrite provided', () => {
+    expect(buildTargetedViewState(targeting, summaryRewrite, resume).hasSummaryRewrite).toBe(true)
+  })
+
+  it('hasSummaryRewrite is false when summaryRewrite is null', () => {
+    expect(buildTargetedViewState(targeting, null, resume).hasSummaryRewrite).toBe(false)
+  })
+
+  it('merges summaryRewrite into targetingData.summary_rewrite', () => {
+    const vs = buildTargetedViewState(targeting, summaryRewrite, resume)
+    expect(vs.targetingData?.summary_rewrite).toEqual(summaryRewrite)
+  })
+
+  it('sets targetingData to null when targeting is null', () => {
+    const vs = buildTargetedViewState(null, null, resume)
+    expect(vs.targetingData).toBeNull()
+    expect(vs.totalReviewable).toBe(0)
+  })
+
+  it('always sets showDiffView to true', () => {
+    expect(buildTargetedViewState(null, null, null).showDiffView).toBe(true)
+  })
+})
+
 // ─── targeted ─────────────────────────────────────────────────────────────────
 
 describe('targeted', () => {
@@ -193,10 +245,33 @@ describe('targeted', () => {
     expect(next.resumeData).toEqual(targetingData.resume)
   })
 
-  it('sets unreviewedCount to number of rewrites', () => {
+  it('sets unreviewedCount to rewrites + removals', () => {
     const state = buildState()
     const next = applyStepComplete(state, 'targeted', targetingData)
     expect(next.unreviewedCount).toBe(2)
+  })
+
+  it('adds 1 to unreviewedCount when summaryRewrite is present', () => {
+    const withSummary = {
+      ...targetingData,
+      summaryRewrite: { original: 'Old summary', rewritten: 'New summary' },
+    }
+    const state = buildState()
+    const next = applyStepComplete(state, 'targeted', withSummary)
+    expect(next.unreviewedCount).toBe(3) // 2 rewrites + 1 summary
+  })
+
+  it('does not add to unreviewedCount when summaryRewrite is absent', () => {
+    const state = buildState()
+    const next = applyStepComplete(state, 'targeted', { ...targetingData, summaryRewrite: null })
+    expect(next.unreviewedCount).toBe(2)
+  })
+
+  it('resets summaryReview and summaryEdit to undefined', () => {
+    const state = buildState({ summaryReview: true, summaryEdit: 'old edit' })
+    const next = applyStepComplete(state, 'targeted', targetingData)
+    expect(next.summaryReview).toBeUndefined()
+    expect(next.summaryEdit).toBeUndefined()
   })
 
   it('clears checkpoint', () => {

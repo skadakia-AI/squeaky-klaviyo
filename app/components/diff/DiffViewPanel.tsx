@@ -9,11 +9,16 @@ interface DiffViewPanelProps {
   bulletEdits: Record<string, string>
   unreviewedCount: number
   excludedOutOfScopeRoles: string[]
+  summaryReview: boolean | undefined
+  summaryEdit: string | undefined
   isStreaming: boolean
   onAccept: (bulletId: string) => void
   onReject: (bulletId: string) => void
   onEdit: (bulletId: string, text: string) => void
   onToggleOutOfScopeRole: (roleId: string) => void
+  onAcceptSummary: () => void
+  onRejectSummary: () => void
+  onEditSummary: (text: string) => void
   onDownload: () => Promise<void>
 }
 
@@ -24,11 +29,16 @@ export default function DiffViewPanel({
   bulletEdits,
   unreviewedCount,
   excludedOutOfScopeRoles,
+  summaryReview,
+  summaryEdit,
   isStreaming,
   onAccept,
   onReject,
   onEdit,
   onToggleOutOfScopeRole,
+  onAcceptSummary,
+  onRejectSummary,
+  onEditSummary,
   onDownload,
 }: DiffViewPanelProps) {
   return (
@@ -47,10 +57,15 @@ export default function DiffViewPanel({
         bulletReviews={bulletReviews}
         bulletEdits={bulletEdits}
         excludedOutOfScopeRoles={excludedOutOfScopeRoles}
+        summaryReview={summaryReview}
+        summaryEdit={summaryEdit}
         onAccept={onAccept}
         onReject={onReject}
         onEdit={onEdit}
         onToggleOutOfScopeRole={onToggleOutOfScopeRole}
+        onAcceptSummary={onAcceptSummary}
+        onRejectSummary={onRejectSummary}
+        onEditSummary={onEditSummary}
       />
     </div>
   )

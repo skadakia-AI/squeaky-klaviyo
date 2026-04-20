@@ -2,8 +2,8 @@ import fs from 'fs'
 import path from 'path'
 import { anthropic, MODELS } from '../anthropic'
 import { readFile, writeFile, storagePath } from '../utils/storage'
-import { storeMessage, fetchMessages } from '../utils/messages'
 import { getServiceClient } from '../supabase'
+import { storeMessage, fetchMessages } from '../utils/messages'
 import type { Resume } from '../types'
 
 export { parseQuantificationQuestions } from '../utils/parse-quantification'
@@ -128,6 +128,8 @@ TURN 2 INSTRUCTION: Execute Steps 4, 5, and 6 internally, then output ONLY the f
     return { success: false, code: 'PARSE_ERROR', message: 'Couldn\'t parse targeting output. Please try again.' }
   }
 
+  await storeMessage(sessionId, 'assistant', turn2Text, 'assessed')
+
   try {
     await writeFile(userId, sessionId, 'targeted_resume.json', JSON.stringify(targetingOutput, null, 2), 'application/json')
   } catch {
@@ -138,7 +140,6 @@ TURN 2 INSTRUCTION: Execute Steps 4, 5, and 6 internally, then output ONLY the f
   const filePath = storagePath(userId, sessionId, 'targeted_resume.json')
   await supabase.from('files').insert({ session_id: sessionId, user_id: userId, file_type: 'targeted_resume', storage_path: filePath })
   await supabase.from('events').insert({ session_id: sessionId, user_id: userId, event: 'resume_targeted' })
-  await storeMessage(sessionId, 'assistant', turn2Text, 'assessed')
 
   const bulletCount = (targetingOutput as { rewrites?: unknown[] }).rewrites?.length ?? 0
 

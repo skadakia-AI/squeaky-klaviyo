@@ -7,10 +7,11 @@ import { exportResume } from './utils/export-resume'
 import { runJDDecoder } from './skills/jd-decoder'
 import { runJDMatchTurn1, runJDMatchTurn1Continue, runJDMatchTurn2 } from './skills/jd-match'
 import { runResumeTargetingTurn1, runResumeTargetingTurn2, parseQuantificationQuestions } from './skills/resume-targeting'
+import { runSummaryRewrite } from './skills/summary-rewrite'
 import { classifyIntent } from './intent-decoder'
 import { handleChat } from './handle-chat'
 import { resolveSessionContext } from './utils/session-context'
-import type { CurrentStep, Resume, IntentContext, StepAction } from './types'
+import type { CurrentStep, Resume, IntentContext, StepAction, SummaryRewrite } from './types'
 
 export type OrchestratorEvent =
   | { type: 'session_created'; session_id: string }
@@ -366,12 +367,21 @@ async function runTurn2(
     return
   }
 
+  // Summary rewrite is non-blocking — proceed without it if it fails.
+  const summaryResult = await runSummaryRewrite(sessionId, userId)
+  const summaryRewrite: SummaryRewrite | null = summaryResult.success
+    ? { original: summaryResult.original, rewritten: summaryResult.rewritten }
+    : null
+  if (!summaryResult.success) {
+    console.error('[orchestrator] summary rewrite failed, proceeding without it. code:', summaryResult.code, 'session:', sessionId)
+  }
+
   await updateSession(sessionId, userId, {
     current_step: 'targeted',
     bullets_total: turn2Result.bulletCount,
   })
 
-  emit({ type: 'step_complete', step: 'targeted', data: { targeting: turn2Result.targetingOutput, resume: turn2Result.resume } })
+  emit({ type: 'step_complete', step: 'targeted', data: { targeting: turn2Result.targetingOutput, summaryRewrite, resume: turn2Result.resume } })
   emit({ type: 'message', role: 'assistant', content: 'Done. Review the changes below.' })
 }
 

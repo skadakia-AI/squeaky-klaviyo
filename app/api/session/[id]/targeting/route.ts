@@ -18,9 +18,10 @@ export async function GET(
 
   const basePath = `users/${userId}/${id}`
 
-  const [resumeRes, targetingRes] = await Promise.all([
+  const [resumeRes, targetingRes, summaryRes] = await Promise.all([
     supabase.storage.from('squeaky').download(`${basePath}/resume_structured.json`),
     supabase.storage.from('squeaky').download(`${basePath}/targeted_resume.json`),
+    supabase.storage.from('squeaky').download(`${basePath}/summary_rewrite.json`),
   ])
 
   if (resumeRes.error || !resumeRes.data) {
@@ -32,5 +33,9 @@ export async function GET(
     ? null
     : JSON.parse(await targetingRes.data.text())
 
-  return Response.json({ resume, targeting })
+  const summaryRewrite = summaryRes.data && !summaryRes.error
+    ? JSON.parse(await summaryRes.data.text())
+    : null
+
+  return Response.json({ resume, targeting, summaryRewrite })
 }

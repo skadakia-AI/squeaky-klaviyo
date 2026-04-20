@@ -7,7 +7,7 @@ export async function POST(request: Request) {
   if (!userId) return Response.json({ error: 'Unauthorized' }, { status: 401 })
 
   const body = await request.json()
-  const { session_id, bullet_reviews, bullet_edits, bullets_accepted, excluded_out_of_scope_roles } = body
+  const { session_id, bullet_reviews, bullet_edits, bullets_accepted, excluded_out_of_scope_roles, summary_accepted, summary_edit } = body
 
   if (!session_id) return Response.json({ error: 'session_id required' }, { status: 400 })
 
@@ -21,6 +21,8 @@ export async function POST(request: Request) {
     bullet_edits: bullet_edits ?? {},
     bullets_accepted: bullets_accepted ?? 0,
     excluded_out_of_scope_roles: excluded_out_of_scope_roles ?? [],
+    summary_accepted: summary_accepted ?? null,
+    summary_edit: summary_edit ?? null,
     updated_at: new Date().toISOString(),
   })
 

@@ -1,4 +1,5 @@
 import { getServiceClient } from '../supabase'
+import { getSession } from './db'
 import type { Resume, TargetingOutput } from '../types'
 
 // Priority: explicit rejection → edited text → accepted rewrite → original
@@ -55,18 +56,14 @@ export async function exportResume(input: ExportResumeInput): Promise<ExportResu
   const supabase = getServiceClient()
 
   // ── 1. Fetch session ─────────────────────────────────────────────────────
-  const { data: session, error: sessionError } = await supabase
-    .from('sessions')
-    .select('bullet_reviews, bullet_edits, excluded_out_of_scope_roles, user_id, company, role')
-    .eq('id', input.sessionId)
-    .single()
-
-  if (sessionError || !session) return { success: false, error: 'SESSION_NOT_FOUND', message: 'Session not found. Try starting a new session.' }
-  if (session.user_id !== input.userId) return { success: false, error: 'UNAUTHORIZED', message: 'You don\'t have access to this session.' }
+  const session = await getSession(supabase, input.sessionId, input.userId)
+  if (!session) return { success: false, error: 'SESSION_NOT_FOUND', message: 'Session not found. Try starting a new session.' }
 
   const bulletReviews: Record<string, boolean> = session.bullet_reviews ?? {}
   const bulletEdits: Record<string, string> = session.bullet_edits ?? {}
   const excludedOutOfScopeRoles: string[] = session.excluded_out_of_scope_roles ?? []
+  const summaryAccepted: boolean | null = session.summary_accepted ?? null
+  const summaryEdit: string | null = session.summary_edit ?? null
 
   // ── 2. Fetch source files ────────────────────────────────────────────────
   const basePath = `users/${input.userId}/${input.sessionId}`
@@ -124,10 +121,12 @@ export async function exportResume(input: ExportResumeInput): Promise<ExportResu
       }))
     }
 
-    if (resume.summary) {
+    const summaryText = summaryEdit
+      ?? (summaryAccepted === true ? (targeting.summary_rewrite?.rewritten ?? resume.summary) : resume.summary)
+    if (summaryText) {
       children.push(new Paragraph({
         spacing: { after: 120 },
-        children: [new TextRun({ text: resume.summary, italics: true, size: 22, font: FONT })],
+        children: [new TextRun({ text: summaryText, italics: true, size: 22, font: FONT })],
       }))
     }
 

@@ -342,3 +342,156 @@ describe('useSession — lazy creation URL replacement', () => {
     expect(mockReplace).not.toHaveBeenCalled()
   })
 })
+
+// ─── Review actions ────────────────────────────────────────────────────────────
+//
+// These tests cover the unreviewedCount guard: reviewing an item decrements the
+// count exactly once, regardless of how many times or in which direction the
+// review changes after that.
+
+const mockTargeting = {
+  role: 'Software Engineer',
+  scope: ['r0'],
+  rewrites: [
+    { bullet_id: 'r0-b0', original: 'Did stuff', rewritten: 'Shipped stuff', objective: 'Impact', structure: 'CAR', unquantified: false },
+    { bullet_id: 'r0-b1', original: 'Made things', rewritten: 'Built things', objective: 'Scale', structure: 'CAR', unquantified: false },
+  ],
+  flagged_for_removal: [
+    { bullet_id: 'r0-b2', original: 'Old stuff', reason: 'Not relevant' },
+  ],
+  credibility_check: { throughline: 'Strong', notes: '' },
+}
+
+const mockResume = {
+  name: 'Test User',
+  experience: [{ id: 'r0', company: 'Acme', title: 'Engineer', bullets: [
+    { id: 'r0-b0', text: 'Did stuff' },
+    { id: 'r0-b1', text: 'Made things' },
+    { id: 'r0-b2', text: 'Old stuff' },
+  ]}],
+  education: [],
+}
+
+// Renders the hook and drives it to targeted state via a mocked SSE stream.
+// Returns the hook result after state settles.
+// unreviewedCount will be 4: 2 rewrites + 1 removal + 1 summary.
+function renderAtTargeted() {
+  mockOpenStream.mockImplementation(
+    (_msg: unknown, _sessionId: unknown, onEvent: (e: unknown) => void) => {
+      onEvent({ type: 'step_complete', step: 'targeted', data: { targeting: mockTargeting, summaryRewrite: { original: 'Original summary', rewritten: 'Rewritten summary' }, resume: mockResume } })
+      onEvent({ type: 'done' })
+      return () => {}
+    }
+  )
+
+  const { result } = renderHook(() => useSession(null))
+
+  act(() => {
+    result.current.sendMessage({ type: 'text', content: 'start' })
+  })
+
+  return result
+}
+
+describe('useSession — bullet review actions', () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+  })
+
+  it('starts with unreviewedCount of 4 after targeted step (2 rewrites + 1 removal + 1 summary)', () => {
+    const result = renderAtTargeted()
+    expect(result.current.unreviewedCount).toBe(4)
+  })
+
+  it('acceptBullet sets review to true and decrements unreviewedCount', () => {
+    const result = renderAtTargeted()
+    act(() => { result.current.acceptBullet('r0-b0') })
+    expect(result.current.bulletReviews['r0-b0']).toBe(true)
+    expect(result.current.unreviewedCount).toBe(3)
+  })
+
+  it('acceptBullet does not decrement unreviewedCount on second call', () => {
+    const result = renderAtTargeted()
+    act(() => { result.current.acceptBullet('r0-b0') })
+    act(() => { result.current.acceptBullet('r0-b0') })
+    expect(result.current.unreviewedCount).toBe(3)
+  })
+
+  it('rejectBullet sets review to false and decrements unreviewedCount', () => {
+    const result = renderAtTargeted()
+    act(() => { result.current.rejectBullet('r0-b0') })
+    expect(result.current.bulletReviews['r0-b0']).toBe(false)
+    expect(result.current.unreviewedCount).toBe(3)
+  })
+
+  it('switching from accept to reject does not decrement again', () => {
+    const result = renderAtTargeted()
+    act(() => { result.current.acceptBullet('r0-b0') })
+    act(() => { result.current.rejectBullet('r0-b0') })
+    expect(result.current.unreviewedCount).toBe(3)
+  })
+
+  it('editBullet sets edit text, marks as accepted, and decrements unreviewedCount', () => {
+    const result = renderAtTargeted()
+    act(() => { result.current.editBullet('r0-b0', 'My custom text') })
+    expect(result.current.bulletEdits['r0-b0']).toBe('My custom text')
+    expect(result.current.bulletReviews['r0-b0']).toBe(true)
+    expect(result.current.unreviewedCount).toBe(3)
+  })
+
+  it('editBullet does not decrement unreviewedCount if bullet was already reviewed', () => {
+    const result = renderAtTargeted()
+    act(() => { result.current.acceptBullet('r0-b0') })
+    act(() => { result.current.editBullet('r0-b0', 'My custom text') })
+    expect(result.current.unreviewedCount).toBe(3)
+  })
+})
+
+describe('useSession — summary review actions', () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+  })
+
+  it('acceptSummary sets summaryReview to true and decrements unreviewedCount', () => {
+    const result = renderAtTargeted()
+    act(() => { result.current.acceptSummary() })
+    expect(result.current.summaryReview).toBe(true)
+    expect(result.current.unreviewedCount).toBe(3)
+  })
+
+  it('acceptSummary does not decrement unreviewedCount on second call', () => {
+    const result = renderAtTargeted()
+    act(() => { result.current.acceptSummary() })
+    act(() => { result.current.acceptSummary() })
+    expect(result.current.unreviewedCount).toBe(3)
+  })
+
+  it('rejectSummary sets summaryReview to false and decrements unreviewedCount', () => {
+    const result = renderAtTargeted()
+    act(() => { result.current.rejectSummary() })
+    expect(result.current.summaryReview).toBe(false)
+    expect(result.current.unreviewedCount).toBe(3)
+  })
+
+  it('switching from accept to reject does not decrement again', () => {
+    const result = renderAtTargeted()
+    act(() => { result.current.acceptSummary() })
+    act(() => { result.current.rejectSummary() })
+    expect(result.current.unreviewedCount).toBe(3)
+  })
+
+  it('editSummary sets summaryEdit and summaryReview to true and decrements unreviewedCount', () => {
+    const result = renderAtTargeted()
+    act(() => { result.current.editSummary('My edited summary') })
+    expect(result.current.summaryEdit).toBe('My edited summary')
+    expect(result.current.summaryReview).toBe(true)
+    expect(result.current.unreviewedCount).toBe(3)
+  })
+
+  it('editSummary does not decrement unreviewedCount if summary was already reviewed', () => {
+    const result = renderAtTargeted()
+    act(() => { result.current.acceptSummary() })
+    act(() => { result.current.editSummary('My edited summary') })
+    expect(result.current.unreviewedCount).toBe(3)
+  })
+})

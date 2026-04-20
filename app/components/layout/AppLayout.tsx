@@ -24,11 +24,16 @@ export default function AppLayout({ initialSessionId = null }: { initialSessionI
           bulletEdits={session.bulletEdits}
           unreviewedCount={session.unreviewedCount}
           excludedOutOfScopeRoles={session.excludedOutOfScopeRoles}
+          summaryReview={session.summaryReview}
+          summaryEdit={session.summaryEdit}
           isStreaming={session.isStreaming}
           onAccept={session.acceptBullet}
           onReject={session.rejectBullet}
           onEdit={session.editBullet}
           onToggleOutOfScopeRole={session.toggleOutOfScopeRole}
+          onAcceptSummary={session.acceptSummary}
+          onRejectSummary={session.rejectSummary}
+          onEditSummary={session.editSummary}
           onDownload={session.downloadResume}
         />
       )}

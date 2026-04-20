@@ -182,12 +182,22 @@ describe('runResumeTargetingTurn2', () => {
     vi.mocked(anthropic.messages.create).mockResolvedValue({
       content: [{ type: 'text', text: `\`\`\`json\n${validJson}\n\`\`\`` }],
     } as never)
-    vi.mocked(writeFile).mockResolvedValue(undefined)
 
     await runResumeTargetingTurn2(SESSION_ID, USER_ID)
 
     const call = vi.mocked(anthropic.messages.create).mock.calls[0][0]
     expect(call.system).toContain('TURN 2 INSTRUCTION')
     expect(call.system).toContain('Steps 4, 5, and 6')
+  })
+
+  it('writes targeted_resume.json to storage', async () => {
+    vi.mocked(fetchMessages).mockResolvedValue([{ role: 'user', content: 'context' }])
+    vi.mocked(anthropic.messages.create).mockResolvedValue({
+      content: [{ type: 'text', text: `\`\`\`json\n${validJson}\n\`\`\`` }],
+    } as never)
+
+    await runResumeTargetingTurn2(SESSION_ID, USER_ID)
+
+    expect(vi.mocked(writeFile)).toHaveBeenCalledWith(USER_ID, SESSION_ID, 'targeted_resume.json', expect.any(String), 'application/json')
   })
 })

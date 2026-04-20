@@ -10,6 +10,7 @@ import type {
   SSEEvent,
   StoredMessage,
   TargetingOutput,
+  SummaryRewrite,
   FitAssessmentData,
   Resume,
 } from './types'
@@ -52,7 +53,31 @@ const initialState: ClientState = {
   unreviewedCount: 0,
   excludedOutOfScopeRoles: [],
   quantificationQuestions: null,
+  summaryReview: undefined,
+  summaryEdit: undefined,
   error: null,
+}
+
+// Single source of truth for all targeting-derived view state.
+// Called from applyStepComplete (live SSE path) and the hydration useEffect (resume path).
+// Returns the fields that are purely derived from targeting data, not from DB user decisions.
+export function buildTargetedViewState(
+  targeting: TargetingOutput | null,
+  summaryRewrite: SummaryRewrite | null,
+  resume: Resume | null,
+) {
+  const targetingData = targeting ? { ...targeting, summary_rewrite: summaryRewrite ?? undefined } : null
+  const totalReviewable =
+    (targeting?.rewrites?.length ?? 0) +
+    (targeting?.flagged_for_removal?.length ?? 0) +
+    (summaryRewrite ? 1 : 0)
+  return {
+    showDiffView: true as const,
+    targetingData,
+    resumeData: resume,
+    totalReviewable,
+    hasSummaryRewrite: !!summaryRewrite,
+  }
 }
 
 export function applyDone(state: ClientState): ClientState {
@@ -121,15 +146,16 @@ export function applyStepComplete(state: ClientState, step: CurrentStep, data?: 
       return { ...state, currentStep: step, checkpoint: null }
 
     case 'targeted': {
-      const d = data as { targeting: TargetingOutput; resume: Resume } | undefined
+      const d = data as { targeting: TargetingOutput; summaryRewrite: SummaryRewrite | null; resume: Resume } | undefined
+      const vs = buildTargetedViewState(d?.targeting ?? null, d?.summaryRewrite ?? null, d?.resume ?? null)
       return {
         ...state,
         currentStep: step,
-        showDiffView: true,
         checkpoint: null,
-        targetingData: d?.targeting ?? null,
-        resumeData: d?.resume ?? null,
-        unreviewedCount: (d?.targeting?.rewrites?.length ?? 0) + (d?.targeting?.flagged_for_removal?.length ?? 0),
+        ...vs,
+        unreviewedCount: vs.totalReviewable,
+        summaryReview: undefined,
+        summaryEdit: undefined,
       }
     }
 
@@ -220,17 +246,20 @@ export function useSession(initialSessionId: string | null = null) {
       }
 
       // For targeted sessions, fetch targeting JSON from storage to restore diff view
-      let showDiffView = false
-      let targetingData: ClientState['targetingData'] = null
-      let resumeData: ClientState['resumeData'] = null
-      let unreviewedCount = 0
+      let targetedViewState: Partial<ClientState> = {}
       if (step === 'targeted') {
-        showDiffView = true
         const td = await fetchTargetingData(initialSessionId)
         if (td) {
-          targetingData = td.targeting
-          resumeData = td.resume
-          unreviewedCount = (td.targeting?.rewrites?.length ?? 0) + (td.targeting?.flagged_for_removal?.length ?? 0)
+          const vs = buildTargetedViewState(td.targeting, td.summaryRewrite, td.resume)
+          const reviewedCount =
+            Object.keys(session.bullet_reviews ?? {}).length +
+            (vs.hasSummaryRewrite && session.summary_accepted !== null ? 1 : 0)
+          targetedViewState = {
+            ...vs,
+            unreviewedCount: Math.max(0, vs.totalReviewable - reviewedCount),
+          }
+        } else {
+          targetedViewState = { showDiffView: true }
         }
       }
 
@@ -240,14 +269,13 @@ export function useSession(initialSessionId: string | null = null) {
         currentStep: step,
         messages: mappedMessages,
         checkpoint,
-        showDiffView,
-        targetingData,
-        resumeData,
-        unreviewedCount,
         bulletReviews: session.bullet_reviews ?? {},
         bulletEdits: session.bullet_edits ?? {},
         excludedOutOfScopeRoles: session.excluded_out_of_scope_roles ?? [],
         quantificationQuestions,
+        summaryReview: session.summary_accepted ?? undefined,
+        summaryEdit: session.summary_edit ?? undefined,
+        ...targetedViewState,
       }))
     })
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -395,6 +423,40 @@ export function useSession(initialSessionId: string | null = null) {
     })
   }, [])
 
+  const acceptSummary = useCallback(() => {
+    setState(prev => {
+      const wasUnreviewed = prev.summaryReview === undefined
+      return {
+        ...prev,
+        summaryReview: true,
+        unreviewedCount: wasUnreviewed ? Math.max(0, prev.unreviewedCount - 1) : prev.unreviewedCount,
+      }
+    })
+  }, [])
+
+  const rejectSummary = useCallback(() => {
+    setState(prev => {
+      const wasUnreviewed = prev.summaryReview === undefined
+      return {
+        ...prev,
+        summaryReview: false,
+        unreviewedCount: wasUnreviewed ? Math.max(0, prev.unreviewedCount - 1) : prev.unreviewedCount,
+      }
+    })
+  }, [])
+
+  const editSummary = useCallback((text: string) => {
+    setState(prev => {
+      const wasUnreviewed = prev.summaryReview === undefined && !prev.summaryEdit
+      return {
+        ...prev,
+        summaryEdit: text,
+        summaryReview: true,
+        unreviewedCount: wasUnreviewed ? Math.max(0, prev.unreviewedCount - 1) : prev.unreviewedCount,
+      }
+    })
+  }, [])
+
   const submitQuantifications = useCallback((answers: string[]) => {
     const questions = stateRef.current.quantificationQuestions
     if (!questions) return
@@ -420,10 +482,10 @@ export function useSession(initialSessionId: string | null = null) {
   }, [])
 
   const downloadResume = useCallback(async () => {
-    const { sessionId, bulletReviews, bulletEdits, excludedOutOfScopeRoles } = stateRef.current
+    const { sessionId, bulletReviews, bulletEdits, excludedOutOfScopeRoles, summaryReview, summaryEdit } = stateRef.current
     if (!sessionId) return
 
-    const result = await postReviews(sessionId, bulletReviews, bulletEdits, excludedOutOfScopeRoles)
+    const result = await postReviews(sessionId, bulletReviews, bulletEdits, excludedOutOfScopeRoles, summaryReview, summaryEdit)
     if (!result.success) {
       setState(prev => ({ ...prev, error: { code: 'REVIEWS_FAILED', message: 'Failed to save your selections. Please try again.' } }))
       return
@@ -457,11 +519,16 @@ export function useSession(initialSessionId: string | null = null) {
     unreviewedCount: state.unreviewedCount,
     excludedOutOfScopeRoles: state.excludedOutOfScopeRoles,
     quantificationQuestions: state.quantificationQuestions,
+    summaryReview: state.summaryReview,
+    summaryEdit: state.summaryEdit,
     error: state.error,
     sendMessage,
     acceptBullet,
     rejectBullet,
     editBullet,
+    acceptSummary,
+    rejectSummary,
+    editSummary,
     toggleOutOfScopeRole,
     submitQuantifications,
     downloadResume,
