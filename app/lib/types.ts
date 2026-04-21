@@ -238,7 +238,6 @@ export interface ClientState {
   resumeData: Resume | null
   bulletReviews: Record<string, boolean>
   bulletEdits: Record<string, string>
-  unreviewedCount: number
   excludedOutOfScopeRoles: string[]
   quantificationQuestions: QuantificationQuestion[] | null
   summaryReview: boolean | undefined

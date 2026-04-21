@@ -50,7 +50,6 @@ const initialState: ClientState = {
   resumeData: null,
   bulletReviews: {},
   bulletEdits: {},
-  unreviewedCount: 0,
   excludedOutOfScopeRoles: [],
   quantificationQuestions: null,
   summaryReview: undefined,
@@ -67,17 +66,35 @@ export function buildTargetedViewState(
   resume: Resume | null,
 ) {
   const targetingData = targeting ? { ...targeting, summary_rewrite: summaryRewrite ?? undefined } : null
-  const totalReviewable =
-    (targeting?.rewrites?.length ?? 0) +
-    (targeting?.flagged_for_removal?.length ?? 0) +
-    (summaryRewrite ? 1 : 0)
   return {
     showDiffView: true as const,
     targetingData,
     resumeData: resume,
-    totalReviewable,
-    hasSummaryRewrite: !!summaryRewrite,
   }
+}
+
+// Computes the number of unreviewed interactive items in the diff view from current state.
+// Uses a Set over bullet_ids so that a bullet appearing in both rewrites and flagged_for_removal
+// (a valid model output) counts as one reviewable item, matching the single BulletRow that renders.
+export function computeUnreviewedCount(
+  targetingData: TargetingOutput | null,
+  resumeData: Resume | null,
+  bulletReviews: Record<string, boolean>,
+  summaryReview: boolean | undefined,
+): number {
+  if (!targetingData) return 0
+  const scopeSet = new Set(targetingData.scope ?? [])
+  const inScopeBulletIds = new Set(
+    resumeData?.experience?.filter(r => scopeSet.has(r.id)).flatMap(r => r.bullets.map(b => b.id)) ?? []
+  )
+  const reviewableIds = new Set(
+    [...(targetingData.rewrites ?? []), ...(targetingData.flagged_for_removal ?? [])]
+      .filter(r => inScopeBulletIds.has(r.bullet_id))
+      .map(r => r.bullet_id)
+  )
+  const unreviewedBullets = [...reviewableIds].filter(id => bulletReviews[id] === undefined).length
+  const unreviewedSummary = targetingData.summary_rewrite && summaryReview === undefined ? 1 : 0
+  return unreviewedBullets + unreviewedSummary
 }
 
 export function applyDone(state: ClientState): ClientState {
@@ -153,7 +170,7 @@ export function applyStepComplete(state: ClientState, step: CurrentStep, data?: 
         currentStep: step,
         checkpoint: null,
         ...vs,
-        unreviewedCount: vs.totalReviewable,
+        bulletReviews: {},
         summaryReview: undefined,
         summaryEdit: undefined,
       }
@@ -250,14 +267,7 @@ export function useSession(initialSessionId: string | null = null) {
       if (step === 'targeted') {
         const td = await fetchTargetingData(initialSessionId)
         if (td) {
-          const vs = buildTargetedViewState(td.targeting, td.summaryRewrite, td.resume)
-          const reviewedCount =
-            Object.keys(session.bullet_reviews ?? {}).length +
-            (vs.hasSummaryRewrite && session.summary_accepted !== null ? 1 : 0)
-          targetedViewState = {
-            ...vs,
-            unreviewedCount: Math.max(0, vs.totalReviewable - reviewedCount),
-          }
+          targetedViewState = buildTargetedViewState(td.targeting, td.summaryRewrite, td.resume)
         } else {
           targetedViewState = { showDiffView: true }
         }
@@ -390,71 +400,31 @@ export function useSession(initialSessionId: string | null = null) {
   }, [handleEvent])
 
   const acceptBullet = useCallback((bulletId: string) => {
-    setState(prev => {
-      const wasUnreviewed = prev.bulletReviews[bulletId] === undefined
-      return {
-        ...prev,
-        bulletReviews: { ...prev.bulletReviews, [bulletId]: true },
-        unreviewedCount: wasUnreviewed ? Math.max(0, prev.unreviewedCount - 1) : prev.unreviewedCount,
-      }
-    })
+    setState(prev => ({ ...prev, bulletReviews: { ...prev.bulletReviews, [bulletId]: true } }))
   }, [])
 
   const rejectBullet = useCallback((bulletId: string) => {
-    setState(prev => {
-      const wasUnreviewed = prev.bulletReviews[bulletId] === undefined
-      return {
-        ...prev,
-        bulletReviews: { ...prev.bulletReviews, [bulletId]: false },
-        unreviewedCount: wasUnreviewed ? Math.max(0, prev.unreviewedCount - 1) : prev.unreviewedCount,
-      }
-    })
+    setState(prev => ({ ...prev, bulletReviews: { ...prev.bulletReviews, [bulletId]: false } }))
   }, [])
 
   const editBullet = useCallback((bulletId: string, text: string) => {
-    setState(prev => {
-      const wasUnreviewed = prev.bulletReviews[bulletId] === undefined && !prev.bulletEdits[bulletId]
-      return {
-        ...prev,
-        bulletEdits: { ...prev.bulletEdits, [bulletId]: text },
-        bulletReviews: { ...prev.bulletReviews, [bulletId]: true },
-        unreviewedCount: wasUnreviewed ? Math.max(0, prev.unreviewedCount - 1) : prev.unreviewedCount,
-      }
-    })
+    setState(prev => ({
+      ...prev,
+      bulletEdits: { ...prev.bulletEdits, [bulletId]: text },
+      bulletReviews: { ...prev.bulletReviews, [bulletId]: true },
+    }))
   }, [])
 
   const acceptSummary = useCallback(() => {
-    setState(prev => {
-      const wasUnreviewed = prev.summaryReview === undefined
-      return {
-        ...prev,
-        summaryReview: true,
-        unreviewedCount: wasUnreviewed ? Math.max(0, prev.unreviewedCount - 1) : prev.unreviewedCount,
-      }
-    })
+    setState(prev => ({ ...prev, summaryReview: true }))
   }, [])
 
   const rejectSummary = useCallback(() => {
-    setState(prev => {
-      const wasUnreviewed = prev.summaryReview === undefined
-      return {
-        ...prev,
-        summaryReview: false,
-        unreviewedCount: wasUnreviewed ? Math.max(0, prev.unreviewedCount - 1) : prev.unreviewedCount,
-      }
-    })
+    setState(prev => ({ ...prev, summaryReview: false }))
   }, [])
 
   const editSummary = useCallback((text: string) => {
-    setState(prev => {
-      const wasUnreviewed = prev.summaryReview === undefined && !prev.summaryEdit
-      return {
-        ...prev,
-        summaryEdit: text,
-        summaryReview: true,
-        unreviewedCount: wasUnreviewed ? Math.max(0, prev.unreviewedCount - 1) : prev.unreviewedCount,
-      }
-    })
+    setState(prev => ({ ...prev, summaryEdit: text, summaryReview: true }))
   }, [])
 
   const submitQuantifications = useCallback((answers: string[]) => {
@@ -516,7 +486,7 @@ export function useSession(initialSessionId: string | null = null) {
     resumeData: state.resumeData,
     bulletReviews: state.bulletReviews,
     bulletEdits: state.bulletEdits,
-    unreviewedCount: state.unreviewedCount,
+    unreviewedCount: computeUnreviewedCount(state.targetingData, state.resumeData, state.bulletReviews, state.summaryReview),
     excludedOutOfScopeRoles: state.excludedOutOfScopeRoles,
     quantificationQuestions: state.quantificationQuestions,
     summaryReview: state.summaryReview,

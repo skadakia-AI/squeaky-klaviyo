@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { applyStepComplete, applyDone, parseVerdictFromText, buildTargetedViewState } from '../../app/lib/session'
+import { applyStepComplete, applyDone, parseVerdictFromText, buildTargetedViewState, computeUnreviewedCount } from '../../app/lib/session'
 import type { ClientState, ChatMessage, CurrentStep } from '../../app/lib/types'
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -16,7 +16,6 @@ function buildState(overrides: Partial<ClientState> = {}): ClientState {
     resumeData: null,
     bulletReviews: {},
     bulletEdits: {},
-    unreviewedCount: 0,
     excludedOutOfScopeRoles: [],
     quantificationQuestions: null,
     summaryReview: undefined,
@@ -184,39 +183,99 @@ describe('buildTargetedViewState', () => {
     credibility_check: { throughline: 'strong', notes: '' },
   }
   const summaryRewrite = { original: 'Old', rewritten: 'New' }
-  const resume = { name: 'Test', experience: [], education: [] }
-
-  it('totalReviewable counts rewrites + removals + summary', () => {
-    const vs = buildTargetedViewState(targeting, summaryRewrite, resume)
-    expect(vs.totalReviewable).toBe(4) // 2 + 1 + 1
-  })
-
-  it('totalReviewable excludes summary when summaryRewrite is null', () => {
-    const vs = buildTargetedViewState(targeting, null, resume)
-    expect(vs.totalReviewable).toBe(3) // 2 + 1
-  })
-
-  it('hasSummaryRewrite is true when summaryRewrite provided', () => {
-    expect(buildTargetedViewState(targeting, summaryRewrite, resume).hasSummaryRewrite).toBe(true)
-  })
-
-  it('hasSummaryRewrite is false when summaryRewrite is null', () => {
-    expect(buildTargetedViewState(targeting, null, resume).hasSummaryRewrite).toBe(false)
-  })
+  const resume = {
+    name: 'Test',
+    experience: [{
+      id: 'r0', company: 'Acme', title: 'SWE',
+      bullets: [{ id: 'r0-b0', text: 'a' }, { id: 'r0-b1', text: 'c' }, { id: 'r0-b2', text: 'e' }],
+    }],
+    education: [],
+  }
 
   it('merges summaryRewrite into targetingData.summary_rewrite', () => {
     const vs = buildTargetedViewState(targeting, summaryRewrite, resume)
     expect(vs.targetingData?.summary_rewrite).toEqual(summaryRewrite)
   })
 
+  it('sets summary_rewrite to undefined when summaryRewrite is null', () => {
+    const vs = buildTargetedViewState(targeting, null, resume)
+    expect(vs.targetingData?.summary_rewrite).toBeUndefined()
+  })
+
   it('sets targetingData to null when targeting is null', () => {
     const vs = buildTargetedViewState(null, null, resume)
     expect(vs.targetingData).toBeNull()
-    expect(vs.totalReviewable).toBe(0)
   })
 
   it('always sets showDiffView to true', () => {
     expect(buildTargetedViewState(null, null, null).showDiffView).toBe(true)
+  })
+})
+
+// ─── computeUnreviewedCount ───────────────────────────────────────────────────
+
+describe('computeUnreviewedCount', () => {
+  const resume = {
+    name: 'Test',
+    experience: [{
+      id: 'r0', company: 'Acme', title: 'SWE',
+      bullets: [{ id: 'r0-b0', text: 'a' }, { id: 'r0-b1', text: 'c' }, { id: 'r0-b2', text: 'e' }],
+    }],
+    education: [],
+  }
+  const targeting = {
+    role: 'SWE',
+    scope: ['r0'],
+    rewrites: [
+      { bullet_id: 'r0-b0', original: 'a', rewritten: 'b', objective: 'x', structure: 'CAR', unquantified: false },
+      { bullet_id: 'r0-b1', original: 'c', rewritten: 'd', objective: 'x', structure: 'CAR', unquantified: false },
+    ],
+    flagged_for_removal: [{ bullet_id: 'r0-b2', original: 'e', reason: 'weak' }],
+    credibility_check: { throughline: 'strong', notes: '' },
+  }
+  const summaryRewrite = { original: 'Old', rewritten: 'New' }
+  const targetingWithSummary = { ...targeting, summary_rewrite: summaryRewrite }
+
+  it('counts all unreviewed bullets + summary', () => {
+    expect(computeUnreviewedCount(targetingWithSummary, resume, {}, undefined)).toBe(4)
+  })
+
+  it('counts only bullets when summary is absent', () => {
+    expect(computeUnreviewedCount(targeting, resume, {}, undefined)).toBe(3)
+  })
+
+  it('decrements as bullets are reviewed', () => {
+    expect(computeUnreviewedCount(targeting, resume, { 'r0-b0': true }, undefined)).toBe(2)
+    expect(computeUnreviewedCount(targeting, resume, { 'r0-b0': true, 'r0-b1': false }, undefined)).toBe(1)
+    expect(computeUnreviewedCount(targeting, resume, { 'r0-b0': true, 'r0-b1': false, 'r0-b2': true }, undefined)).toBe(0)
+  })
+
+  it('counts summary as unreviewed when summaryReview is undefined', () => {
+    expect(computeUnreviewedCount(targetingWithSummary, resume, { 'r0-b0': true, 'r0-b1': true, 'r0-b2': true }, undefined)).toBe(1)
+  })
+
+  it('does not count summary when summaryReview is set', () => {
+    expect(computeUnreviewedCount(targetingWithSummary, resume, { 'r0-b0': true, 'r0-b1': true, 'r0-b2': true }, true)).toBe(0)
+  })
+
+  it('counts a bullet in both rewrites and flagged_for_removal only once', () => {
+    const t = { ...targeting, flagged_for_removal: [{ bullet_id: 'r0-b0', original: 'a', reason: 'weak' }] }
+    // r0-b0 in rewrites AND removals → 2 unique bullets (r0-b0, r0-b1), no removal-only bullets
+    expect(computeUnreviewedCount(t, resume, {}, undefined)).toBe(2)
+  })
+
+  it('does not count rewrites with hallucinated bullet_ids', () => {
+    const t = { ...targeting, rewrites: [...targeting.rewrites, { bullet_id: 'r0-b99', original: 'x', rewritten: 'y', objective: 'z', structure: 'CAR', unquantified: false }] }
+    expect(computeUnreviewedCount(t, resume, {}, undefined)).toBe(3) // r0-b99 not in resume
+  })
+
+  it('does not count bullets for out-of-scope roles', () => {
+    const t = { ...targeting, flagged_for_removal: [{ bullet_id: 'r1-b0', original: 'x', reason: 'weak' }] }
+    expect(computeUnreviewedCount(t, resume, {}, undefined)).toBe(2) // r1 not in scope
+  })
+
+  it('returns 0 when targetingData is null', () => {
+    expect(computeUnreviewedCount(null, resume, {}, undefined)).toBe(0)
   })
 })
 
@@ -234,7 +293,14 @@ describe('targeted', () => {
       flagged_for_removal: [],
       credibility_check: { throughline: 'strong', notes: '' },
     },
-    resume: { name: 'Test User', experience: [], education: [] },
+    resume: {
+      name: 'Test User',
+      experience: [{
+        id: 'r0', company: 'Acme', title: 'SWE',
+        bullets: [{ id: 'r0-b0', text: 'old' }, { id: 'r0-b1', text: 'old2' }],
+      }],
+      education: [],
+    },
   }
 
   it('opens diff view and stores targeting + resume data', () => {
@@ -243,28 +309,6 @@ describe('targeted', () => {
     expect(next.showDiffView).toBe(true)
     expect(next.targetingData).toEqual(targetingData.targeting)
     expect(next.resumeData).toEqual(targetingData.resume)
-  })
-
-  it('sets unreviewedCount to rewrites + removals', () => {
-    const state = buildState()
-    const next = applyStepComplete(state, 'targeted', targetingData)
-    expect(next.unreviewedCount).toBe(2)
-  })
-
-  it('adds 1 to unreviewedCount when summaryRewrite is present', () => {
-    const withSummary = {
-      ...targetingData,
-      summaryRewrite: { original: 'Old summary', rewritten: 'New summary' },
-    }
-    const state = buildState()
-    const next = applyStepComplete(state, 'targeted', withSummary)
-    expect(next.unreviewedCount).toBe(3) // 2 rewrites + 1 summary
-  })
-
-  it('does not add to unreviewedCount when summaryRewrite is absent', () => {
-    const state = buildState()
-    const next = applyStepComplete(state, 'targeted', { ...targetingData, summaryRewrite: null })
-    expect(next.unreviewedCount).toBe(2)
   })
 
   it('resets summaryReview and summaryEdit to undefined', () => {
@@ -286,7 +330,6 @@ describe('targeted', () => {
     expect(next.showDiffView).toBe(true)
     expect(next.targetingData).toBeNull()
     expect(next.resumeData).toBeNull()
-    expect(next.unreviewedCount).toBe(0)
   })
 })
 

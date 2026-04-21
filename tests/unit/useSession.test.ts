@@ -253,7 +253,14 @@ describe('useSession — targeted session hydration', () => {
       flagged_for_removal: [],
       out_of_scope_roles: [],
     }
-    const mockResume = { name: 'Test User', experience: [], education: [] }
+    const mockResume = {
+      name: 'Test User',
+      experience: [{
+        id: 'r0', company: 'Acme', title: 'SWE',
+        bullets: [{ id: 'r0-b0', text: 'Built things' }],
+      }],
+      education: [],
+    }
 
     mockFetchSessionById.mockResolvedValue({
       session: makeSession({ current_step: 'targeted' }),
