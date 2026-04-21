@@ -2,6 +2,9 @@
 
 ## Launch Checklist (ship these first)
 
+- [ ] **Rotate API keys (Vercel breach response)** — rotate `SUPABASE_SERVICE_ROLE_KEY` (Supabase → Settings → Data API → regenerate Project Secret Key), `ANTHROPIC_API_KEY` (console.anthropic.com → API Keys), and Clerk secret keys. Update all three in Vercel env vars (Production, Preview, Development) and in `.env.local`. Mark `SUPABASE_SERVICE_ROLE_KEY` and `ANTHROPIC_API_KEY` as Sensitive in Vercel for Production and Preview.
+- [ ] **Create public repo for Klaviyo role** — duplicate current repo to a new public GitHub repo (`squeaky-klaviyo` or similar): create empty repo on GitHub, then `git remote add klaviyo <url> && git push klaviyo master`. Send that link to Klaviyo.
+- [ ] **Separate dev vs. prod environments** — create a second Supabase project (squeaky-dev) and a second Anthropic API key (squeaky-dev) for local development. Update `.env.local` to point to dev credentials only. Vercel Production and Preview continue to use prod credentials. Clerk already provides separate dev/prod instances — verify `.env.local` uses the dev instance keys.
 - [ ] **Anthropic Tier 2 upgrade** — deposit $40 in the Anthropic console before any real users arrive. Tier 1 caps at $100/month spend and 8k OTPM; a burst of 5-6 simultaneous users will generate 429s and hard-fail sessions. Tier 2 is 11x the output capacity ($500/month ceiling).
 - [ ] **Clerk production mode** — flip Clerk to prod in dashboard, update env vars. No code changes.
 - [x] **App landing + empty state** — new user signs in and sees a clear starting point, not a blank screen. Minimum viable onboarding.
@@ -13,6 +16,16 @@
 - [ ] **Confirm Supabase prod project** — verify real user data will land in a production Supabase instance, not a dev one.
 - [x] **JD Decoded card cleanup** — reduce verbosity, improve scannability. First impression of the product's output quality.
 - [ ] **Funnel query before first user** — write and test the Supabase query that shows step completion rates (JD uploaded → decoded → resume uploaded → assessed → targeted → downloaded). North star: total docx downloads. Quality gate: download rate per completed workflow (exported / targeted sessions) + bullet accept rate. Run on day 2 and weekly after.
+
+---
+
+## Bugs (discovered Apr 20)
+
+- [x] **No-summary resume → no summary generated** — if the uploaded resume has no summary section, resume-targeting never generates one. Should create a new summary even when none exists in the source.
+- [ ] **Checkpoint buttons missing after resume swap** — upload wrong doc, then replace it. "Confirm scope", "Tailor my resume" / "Pass" buttons don't re-render. Likely a hydration issue: markers restored from old session state aren't re-applied after the new resume is loaded.
+- [ ] **Bullet rewrite latency** — Turn 2 (JSON rewrite) is still slow. Investigate prompt size, model choice, and whether streaming can be added or the payload trimmed.
+- [x] **Unreviewed count off-by-one blocks download** — after accepting all bullet rewrites and the summary rewrite, the unreviewed count still shows 1 and the download button stays locked. Fixed: `totalReviewable` now filters against in-scope bullet IDs from the resume, preventing phantom counts from model-generated entries for non-existent or out-of-scope bullets.
+- [ ] **Scope adjustment doesn't handle unlisted experience** — when the verdict is "not a fit" because the resume lacks specific evidence (e.g., a tool or project the user has actually done), the scope adjustment flow has no path for the user to say "I've done this but it's not in my resume." Currently the orchestrator only looks at resume content to reframe scope — it can't surface or incorporate experience the candidate mentions conversationally. Need a mechanism to capture user-stated context and fold it into the targeting and narrative.
 
 ---
 
@@ -51,6 +64,7 @@
 - [ ] **Stripe integration** — paywall for usage beyond a free tier. Decide on model (per-session, subscription, seat) before building.
 
 ### Skill Improvements
+- [ ] **Summary rewrite prompt** — `skills/summary-rewrite.md` iterated but output still has issues. Known problems: slow generation (Turn 2 itself is slow), abstract phrasing in S3, needs objection-handling mechanic for stretch verdicts. Multiple test sessions run; prompt is mid-iteration. *Resume here next session.*
 - [ ] **Non-bullet resume sections** — targeting should also rewrite the summary, skills, and projects sections (not just experience bullets). Requires schema changes (types.ts), skill prompt additions, diff view extensions. *Schema design is the gating work.*
 - [ ] **Resume formatting fidelity** — downloaded .docx should match the original uploaded resume as closely as possible: fonts, margins, section spacing, header style. Currently export uses a generic template. Requires reading and replicating the source document's formatting. *See also: Growth & Delight — this is a pre-pricing gate.*
 - [ ] **JD Decoder: surface the non-obvious insight** — the decode should lead with what the role is *really* about: org signals, buried priorities, subtext that a seasoned recruiter would catch. Currently it reformats; it needs to reveal. Prompt change in `jd-decoder.md`, no code changes. This is the moment users decide whether the product is smart or just a formatter. *Consider for launch.*
