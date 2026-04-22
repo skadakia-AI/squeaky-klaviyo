@@ -1,8 +1,20 @@
 import { getServiceClient } from '../supabase'
 import { getSession } from './db'
-import type { Resume, TargetingOutput } from '../types'
+import type { Resume, SummaryRewrite, TargetingOutput } from '../types'
 
 // Priority: explicit rejection → edited text → accepted rewrite → original
+export function resolveSummary(
+  originalText: string | undefined,
+  summaryAccepted: boolean | null,
+  summaryEdit: string | null,
+  rewritten: string | null | undefined,
+): string | undefined {
+  if (summaryAccepted === false) return originalText
+  if (summaryEdit) return summaryEdit
+  if (rewritten && summaryAccepted === true) return rewritten
+  return originalText
+}
+
 export function resolveText(
   bulletId: string,
   originalText: string,
@@ -68,9 +80,10 @@ export async function exportResume(input: ExportResumeInput): Promise<ExportResu
   // ── 2. Fetch source files ────────────────────────────────────────────────
   const basePath = `users/${input.userId}/${input.sessionId}`
 
-  const [resumeRes, targetingRes] = await Promise.all([
+  const [resumeRes, targetingRes, summaryRes] = await Promise.all([
     supabase.storage.from('squeaky').download(`${basePath}/resume_structured.json`),
     supabase.storage.from('squeaky').download(`${basePath}/targeted_resume.json`),
+    supabase.storage.from('squeaky').download(`${basePath}/summary_rewrite.json`),
   ])
 
   if (resumeRes.error || !resumeRes.data) return { success: false, error: 'RESUME_NOT_FOUND', message: 'Resume data not found for this session. Try re-uploading your resume.' }
@@ -78,6 +91,9 @@ export async function exportResume(input: ExportResumeInput): Promise<ExportResu
 
   const resume: Resume = JSON.parse(await resumeRes.data.text())
   const targeting: TargetingOutput = JSON.parse(await targetingRes.data.text())
+  const summaryRewrite: SummaryRewrite | null = summaryRes.data && !summaryRes.error
+    ? JSON.parse(await summaryRes.data.text())
+    : null
 
   // ── 3. Bullet resolution ─────────────────────────────────────────────────
   const removedBulletIds = new Set(
@@ -121,8 +137,7 @@ export async function exportResume(input: ExportResumeInput): Promise<ExportResu
       }))
     }
 
-    const summaryText = summaryEdit
-      ?? (summaryAccepted === true ? (targeting.summary_rewrite?.rewritten ?? resume.summary) : resume.summary)
+    const summaryText = resolveSummary(resume.summary, summaryAccepted, summaryEdit, summaryRewrite?.rewritten)
     if (summaryText) {
       children.push(new Paragraph({
         spacing: { after: 120 },

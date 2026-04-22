@@ -2,7 +2,7 @@ import { vi, describe, it, expect } from 'vitest'
 
 vi.mock('../../app/lib/supabase', () => ({ getServiceClient: vi.fn() }))
 
-import { buildExportFilename, resolveText } from '../../app/lib/utils/export-resume'
+import { buildExportFilename, resolveSummary, resolveText } from '../../app/lib/utils/export-resume'
 
 describe('buildExportFilename', () => {
   it('builds initials_company_role format for a full set of inputs', () => {
@@ -49,6 +49,41 @@ describe('buildExportFilename', () => {
 
   it('handles single-word names gracefully', () => {
     expect(buildExportFilename('Madonna', 'Acme', 'Engineer')).toBe('M_Acme_Engineer.docx')
+  })
+})
+
+describe('resolveSummary', () => {
+  const original = 'Original summary.'
+  const rewritten = 'Rewritten summary.'
+  const edited = 'User edited summary.'
+
+  it('returns rewritten when accepted and rewrite exists', () => {
+    expect(resolveSummary(original, true, null, rewritten)).toBe(rewritten)
+  })
+
+  it('returns edit when user edited, regardless of accepted state', () => {
+    expect(resolveSummary(original, true, edited, rewritten)).toBe(edited)
+    expect(resolveSummary(original, null, edited, rewritten)).toBe(edited)
+  })
+
+  it('returns original when rejected', () => {
+    expect(resolveSummary(original, false, null, rewritten)).toBe(original)
+  })
+
+  it('returns original when rejected even if edit exists', () => {
+    expect(resolveSummary(original, false, edited, rewritten)).toBe(original)
+  })
+
+  it('returns original when not reviewed (null accepted)', () => {
+    expect(resolveSummary(original, null, null, rewritten)).toBe(original)
+  })
+
+  it('returns original when accepted but no rewrite exists — the bug this test catches', () => {
+    expect(resolveSummary(original, true, null, null)).toBe(original)
+  })
+
+  it('returns undefined when original is undefined and not accepted', () => {
+    expect(resolveSummary(undefined, null, null, rewritten)).toBeUndefined()
   })
 })
 
