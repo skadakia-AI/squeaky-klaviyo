@@ -48,4 +48,7 @@ next-env.d.ts
 .mcp.json
 .mcp.local.json
 
+# Internal planning
+todo.md
+
 # Product strategy (not for public repo)
