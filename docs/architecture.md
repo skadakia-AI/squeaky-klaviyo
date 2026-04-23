@@ -42,6 +42,7 @@ Squeaky is a chat-driven web app with a deterministic, checkpoint-based workflow
 │                      app/lib/skills/                         │
 │                                                              │
 │    jd-decoder.ts      jd-match.ts      resume-targeting.ts  │
+│    summary-rewrite.ts                                       │
 │                                                              │
 │    Each owns:                                                │
 │      · Typed context interface (what files it needs)         │
@@ -58,9 +59,14 @@ Squeaky is a chat-driven web app with a deterministic, checkpoint-based workflow
 │                                                              │
 │   load-jd.ts        load-resume.ts      update-session.ts   │
 │   export-resume.ts  storage.ts          messages.ts          │
+│   db.ts                                                      │
 │                                                              │
-│   storage.ts  — read/write files in Supabase Storage         │
+│   storage.ts  — read/write blobs in the Supabase Storage     │
+│                 bucket (squeaky). Skills write skill-specific │
+│                 metadata to the files/events Postgres tables  │
+│                 directly — intentional, not a violation.      │
 │   messages.ts — read/write conversation history              │
+│   db.ts       — typed helpers for the sessions table         │
 └──────────────────────────────────────────────────────────────┘
 ```
 
@@ -233,6 +239,7 @@ Server-Sent Events (SSE) are used both for progress updates and token-by-token s
 | jd-match Turn 2 | `messages.stream()` | Yes |
 | resume-targeting Turn 1 | `messages.stream()` | Yes |
 | resume-targeting Turn 2 | `messages.create()` | No — JSON output, buffered and processed |
+| summary-rewrite | `messages.create()` | No — runs in parallel with targeting Turn 2, non-blocking |
 
 **Mid-stream error:** if Claude errors during a streaming call, the orchestrator emits an `error` event. The client clears the incomplete bubble and renders the error. Session state is not advanced.
 

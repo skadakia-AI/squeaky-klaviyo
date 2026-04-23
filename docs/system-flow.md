@@ -65,11 +65,12 @@ users/
   {user_id}/
     {session_id}/
       raw_jd.md              ← written by loadJD, read by jd-decoder
-      decoded_jd.md          ← written by jd-decoder, read by jd-match + resume-targeting
+      decoded_jd.md          ← written by jd-decoder, read by jd-match + resume-targeting + summary-rewrite
       resume_main.md         ← written by loadResume
-      resume_structured.json ← written by loadResume, read by jd-match + resume-targeting
-      fit_assessment.md      ← written by jd-match Turn 2
+      resume_structured.json ← written by loadResume, read by jd-match + resume-targeting + summary-rewrite
+      fit_assessment.md      ← written by jd-match Turn 2, read by summary-rewrite (graceful fallback if missing)
       targeted_resume.json   ← written by resume-targeting Turn 2
+      summary_rewrite.json   ← written by summary-rewrite (parallel with targeting Turn 2), read by exportResume
       export.docx            ← written by exportResume (internal storage path; download filename is personalised)
 ```
 
@@ -169,6 +170,8 @@ It exists because some step completions require non-trivial UI changes that go b
 
 **`assessed`** — Identical pattern. The fit assessment streams as plain text. On `step_complete: assessed`, it gets upgraded to `'fit_assessment_card'` with the verdict data attached. The pursue/pass checkpoint buttons appear because `checkpoint` is set to `'pursue_or_pass'`.
 
+**`targeted`** — The `step_complete: targeted` event carries `{ targeting, summaryRewrite, resume }` in its data payload. `applyStepComplete` stores all three in client state, opens the diff view, and clears the checkpoint. `summaryRewrite` may be `null` if the parallel summary call failed — the diff view handles that gracefully by not showing a summary section.
+
 Other cases are simpler: set `currentStep`, set or clear `checkpoint`, set `showDiffView`, store `targetingData`.
 
 The reason this is a pure function rather than inline in `handleEvent` is testability — every state transition can be tested by calling the function with a synthetic state and asserting the output. No network, no database, no React rendering required.
@@ -209,14 +212,16 @@ User confirms targeting scope
         reads:  decoded_jd.md, resume_structured.json
         writes: Turn 1 messages to messages table (assessed step)
         ↓
-  └─► runResumeTargetingTurn2()
-        reads:  messages table (assessed step)
-        writes: targeted_resume.json
-               Turn 2 messages to messages table
+  └─► runResumeTargetingTurn2() + runSummaryRewrite()  [parallel]
+        Turn 2 reads:  messages table (assessed step)
+        Turn 2 writes: targeted_resume.json, Turn 2 messages to messages table
+        Summary reads: decoded_jd.md, resume_structured.json, fit_assessment.md (optional)
+        Summary writes: summary_rewrite.json
+        Summary is non-blocking: if it fails, export proceeds without a rewritten summary
         ↓
 User downloads resume
   └─► exportResume()
-        reads:  targeted_resume.json, resume_structured.json
+        reads:  targeted_resume.json, resume_structured.json, summary_rewrite.json (optional)
                bullet_reviews, bullet_edits, excluded_out_of_scope_roles from session
         writes: export.docx
 ```
@@ -354,9 +359,10 @@ Utilities are the I/O layer. They have no routing logic, no Claude calls, no sta
 
 | Utility | Responsibility |
 |---|---|
-| `storage.ts` | Read and write files in the Supabase Storage bucket. The only place in the codebase that touches Storage. |
+| `storage.ts` | Read and write blobs in the Supabase Storage bucket (`squeaky`). The only place that touches Storage blob I/O. Skills also write skill-specific metadata rows to the `files` and `events` Postgres tables directly — this is intentional: each skill's metadata is different, so centralizing it would just be pass-through indirection. |
 | `messages.ts` | Read and write message history in the Supabase messages table. |
 | `update-session.ts` | Write session metadata (current_step, verdict, etc.) to the Supabase sessions table. |
+| `db.ts` | Typed helper functions for the sessions table (`createSession`, `getSession`, `listSessions`, `patchSession`, `archiveSession`). All session table access in API routes goes through here. |
 | `load-jd.ts` | Extract JD text from URL/PDF/plain text, call Haiku to verify it's a real job description, write `raw_jd.md`, log events. |
 | `load-resume.ts` | Parse resume file (PDF/DOCX/text), call Haiku to verify it's a real resume, call Haiku for structured extraction, write resume files, log events. |
 | `export-resume.ts` | Apply bullet reviews, edits, and out-of-scope role exclusions; generate DOCX; write to storage; return signed download URL. Resolution order for each bullet: explicit rejection → original; edit present → edited text; accepted → AI rewrite; else → original. Out-of-scope roles in `excluded_out_of_scope_roles` export header only (no bullets). Download filename derived from user initials + session company + role (e.g. `SK_Acme-Corp_Senior-Engineer.docx`). |

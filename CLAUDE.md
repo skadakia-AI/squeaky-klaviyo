@@ -38,7 +38,7 @@ Orchestrator (app/lib/orchestrator.ts)
 Skill Runners (app/lib/skills/)
   └─ each fetches its own context, calls Claude, parses output
 Utilities (app/lib/utils/)
-  └─ storage.ts, messages.ts, load-jd.ts, load-resume.ts, update-session.ts, export-resume.ts
+  └─ storage.ts, messages.ts, db.ts, load-jd.ts, load-resume.ts, update-session.ts, export-resume.ts
 ```
 
 **Rule:** the route only does auth + SSE setup. The orchestrator owns session logic. Skill runners own Claude calls. Utilities own I/O. Don't collapse layers.
@@ -91,6 +91,7 @@ Each runner in `app/lib/skills/` is responsible for:
 - `jd-decoder.ts` — reads `raw_jd.md`
 - `jd-match.ts` — reads `decoded_jd.md`, `resume_structured.json`
 - `resume-targeting.ts` — reads `decoded_jd.md`, `resume_structured.json`, `fit_assessment.md` (graceful fallback if missing)
+- `summary-rewrite.ts` — reads `decoded_jd.md`, `resume_structured.json`, `fit_assessment.md` (graceful fallback); runs in parallel with targeting Turn 2, non-blocking
 
 ---
 
