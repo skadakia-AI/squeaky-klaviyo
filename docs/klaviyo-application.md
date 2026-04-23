@@ -146,8 +146,8 @@ What I haven't solved yet: I'd love to run parallel agents from multiple termina
 **Getting Started / Setup Instructions**
 
 ```bash
-git clone <repo-url>
-cd squeaky-app
+git clone https://github.com/skadakia-AI/squeaky-klaviyo.git
+cd squeaky-klaviyo
 npm install
 
 cp .env.example .env.local
@@ -226,5 +226,5 @@ The job search doesn't end at the application. The natural next layer is intervi
 
 **Live URL**
 
-[To be added]
+https://squeaky-klaviyo.vercel.app/
 
