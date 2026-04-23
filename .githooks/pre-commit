@@ -10,7 +10,25 @@ if [ $LINT_EXIT -ne 0 ]; then
   exit 1
 fi
 
-# 2. Warn if behavior-critical source files changed without any test file changes
+# 2. Type check
+npx tsc --noEmit
+TSC_EXIT=$?
+if [ $TSC_EXIT -ne 0 ]; then
+  echo ""
+  echo "Commit blocked: TypeScript errors must be fixed before committing."
+  exit 1
+fi
+
+# 3. Tests
+npx vitest run
+VITEST_EXIT=$?
+if [ $VITEST_EXIT -ne 0 ]; then
+  echo ""
+  echo "Commit blocked: tests must pass before committing."
+  exit 1
+fi
+
+# 4. Warn if behavior-critical source files changed without any test file changes
 CHANGED=$(git diff --cached --name-only)
 SOURCE_CHANGED=$(echo "$CHANGED" | grep -E 'app/lib/(orchestrator|session|sse)\.|app/lib/(skills|utils)/')
 TEST_CHANGED=$(echo "$CHANGED" | grep 'tests/')

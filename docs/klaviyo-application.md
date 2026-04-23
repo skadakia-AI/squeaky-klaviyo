@@ -23,7 +23,7 @@ A job description isn't a checklist but a cipher, containing clues such as: What
 
 As a nontechnical founder building early-stage GTM, I learned that you can't find product-market fit without first understanding what your customer is trying to accomplish, what they've already tried, and the tradeoffs they're weighing. The same analysis applies to a job search ("candidate-market fit"). Without it, you're polishing language without resolving the positioning problem.
 
-My initial target is mid-career professionals recently laid off from high-paying roles, who haven't had to apply in 3+ years, and are mass applying but not breaking through.
+My initial target is mid-career professionals recently laid off from high-paying roles, who haven't had to apply in 3+ years, and are mass applying but struggling to break through.
 
 If this were solved: that candidate lands the role they weren't the obvious choice for — because they walked in knowing exactly what the hiring manager needed, and their resume made the case without fluff. You'd see it in downloaded resumes: candidates completing the full flow and submitting something they trusted.
 
@@ -46,7 +46,7 @@ AI is not supplementary here but core. Three things require it:
 - **Reasoning across a gap.** Mapping a nonlinear background onto a specific role's requirements isn't a lookup problem. It requires judgment about what counts as evidence, what's transferable, and what's genuinely missing.
 - **Rewriting with constraint.** The model can only use what the candidate has provided. No invented metrics, no fabricated outcomes. A Turn 1 audit flags any bullet missing real numbers before rewriting — because early testing showed the model would otherwise generate plausible-sounding metrics that weren't true.
 
-A non-AI version of this is a career coach charging $400 a session. The output is the same. The cost and access aren't.
+A non-AI version of this is a career coach charging $400 a session. The output might be similar but the cost and access aren't.
 
 ---
 
@@ -123,7 +123,7 @@ This maps cleanly to how the system fails. A read failure means missing context.
 
 **What did AI help you do faster, and where did it get in your way?**
 
-I don't write code. Claude Code and I are the sole implementers on this project — I own the product spec and the decisions; Claude writes the code. The first working version of Squeaky — four-layer architecture, full UI, SSE streaming, Supabase storage — was running with a real user in under two weeks.
+I don't write code. Claude Code and I are the sole implementers on this project — I own the product spec and the decisions; Claude writes the code. The first working version of Squeaky — four-layer architecture, full UI, SSE streaming, Supabase storage — was running with a real user in under two weeks — in sessions ranging from 30 minutes to 2.5 hours, fit around other commitments. The constraint was clarifying: you learn quickly what to prioritize when you only have an hour.
 
 What surprised me was how much I learned in the process. I came in without a background in software architecture. Working through this project taught me how to think about separating concerns across layers, when to use server-side vs. client-side state, how SSE differs from WebSockets and why it matters, how storage buckets work, how to structure tests, how to debug systematically, and how to work around real tool limitations — like the fact that neither raw fetch nor Jina can read LinkedIn job descriptions, which shaped the JD ingestion design.
 
