@@ -159,7 +159,7 @@ Requires Node 18+. Supabase bucket named `squeaky`, path convention: `users/{use
 
 ## Demo
 
-[Video URL — to be added]
+https://www.loom.com/share/2623dba3a27943db88ddad313c58282f
 
 1. Paste a job description → Squeaky decodes it: hiring manager's problem, outcome they own, risks they're managing, what a no-brainer hire looks like, foreseeable gaps
 2. Upload your resume (PDF or Word) → fit verdict, hard requirement status, arc alignment
